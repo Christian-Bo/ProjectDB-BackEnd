@@ -7,6 +7,7 @@ import com.nexttechstore.nexttech_backend.repository.sql.VentasCommandRepository
 import com.nexttechstore.nexttech_backend.repository.sql.VentasSqlRepository;
 import com.nexttechstore.nexttech_backend.service.api.VentasService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -25,17 +26,15 @@ public class VentasServiceImpl implements VentasService {
     }
 
     @Override
+    @Transactional
     public int registrar(VentaRequestDto req) {
         return commandRepo.registrarVenta(req);
     }
 
     @Override
     public VentaDto obtenerVentaPorId(int id) {
-        VentaDto dto = queryRepo.findVentaById(id);
-        if (dto == null) {
-            throw new NoSuchElementException("Venta no encontrada: id=" + id);
-        }
-        // 🔧 Ajuste: devuelve VentaDetalleDto, no VentaDto.Item
+        var dto = queryRepo.findVentaById(id);
+        if (dto == null) throw new NoSuchElementException("Venta no encontrada: id=" + id);
         dto.setItems(queryRepo.findItemsByVentaId(id));
         return dto;
     }
