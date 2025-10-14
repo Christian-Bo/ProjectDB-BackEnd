@@ -10,6 +10,7 @@ import java.util.List;
 public interface VentasService {
     int registrar(VentaRequestDto req);
     VentaDto obtenerVentaPorId(int id);
+    void anular(int ventaId, String motivo);
     List<VentaResumenDto> listarVentas(LocalDate desde,
                                        LocalDate hasta,
                                        Integer clienteId,

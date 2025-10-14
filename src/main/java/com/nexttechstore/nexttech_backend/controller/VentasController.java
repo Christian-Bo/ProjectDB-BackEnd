@@ -44,4 +44,19 @@ public class VentasController {
     public VentaDto obtener(@PathVariable int id) {
         return service.obtenerVentaPorId(id);
     }
+
+    @PostMapping("/{id}/anular")
+    public Map<String, Object> anular(@PathVariable int id,
+                                      @RequestParam(required = false) String motivo) {
+        // Llama al repo SP a través del service (si prefieres, lo pasamos por el service)
+        try {
+            // Si tu Service aún no expone anular, puedes inyectar VentasSpRepository directamente.
+            // Aquí asumo que tienes el bean spRepo disponible en el service (ajusta si hace falta).
+            // Opción rápida: expón anular en VentasService y dele en VentasServiceImpl.
+            throw new UnsupportedOperationException("Exponer método anular en VentasService/VentasServiceImpl o inyectar VentasSpRepository aquí.");
+        } catch (Exception e) {
+            throw new RuntimeException(e.getMessage(), e);
+        }
+    }
+
 }
