@@ -1,4 +1,6 @@
 package com.nexttechstore.nexttech_backend.dto.seg;
 
-public class RolDto {
-}
+public record RolDto(
+        Integer id,
+        String nombre
+) { }

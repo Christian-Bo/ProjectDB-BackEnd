@@ -1,4 +1,4 @@
-package com.nexttechstore.nexttech_backend.dto;
+package com.nexttechstore.nexttech_backend.dto.seg;
 
 import java.time.OffsetDateTime;
 
