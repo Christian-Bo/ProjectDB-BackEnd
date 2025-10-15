@@ -23,16 +23,16 @@ public class CxcController {
         this.service = service;
     }
 
-    /** Mantengo tu firma, pero OJO: este DTO no trae clienteId ni formaPago (revisar) */
+    // [Compat] Tu método original; hoy lanza BadRequest porque no trae clienteId/formapago.
     @PostMapping("/pagos")
     public Map<String, Object> aplicarPago(@Valid @RequestBody PagoRequestDto req) {
         int pagoId = service.aplicarPago(req);
         return Map.of("pagoId", pagoId, "status", "OK");
     }
 
-    // ---- NUEVOS ENDPOINTS RECOMENDADOS ----
+    // ---- NUEVOS ENDPOINTS ----
 
-    /** Crear pago simple (cliente + monto + formaPago) */
+    /** Crear pago (caja): cliente + monto + forma de pago + (opcional) observaciones */
     @PostMapping("/pagos/crear")
     public Map<String, Object> crearPago(
             @RequestParam Integer clienteId,
@@ -44,7 +44,7 @@ public class CxcController {
         return Map.of("pagoId", pagoId, "status", "OK");
     }
 
-    /** Aplicar pago a documentos (usa TVP) */
+    /** Aplicar pago a documentos (usa TVP dbo.tvp_cxc_aplicacion) */
     @PostMapping("/pagos/{pagoId}/aplicar")
     public Map<String, Object> aplicarPagoADocumentos(
             @PathVariable int pagoId,
@@ -64,7 +64,7 @@ public class CxcController {
         return Map.of("pagoId", pagoId, "status", "ANULADO");
     }
 
-    /** Estado de cuenta */
+    /** Estado de cuenta por cliente (consulta) */
     @GetMapping("/estado-cuenta")
     public List<CxcSpRepository.EstadoCuentaRow> estadoCuenta(
             @RequestParam Integer clienteId,
