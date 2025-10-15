@@ -24,7 +24,7 @@ public class CorsConfig implements WebMvcConfigurer {
     @Value("${app.cors.allowed-origins:http://localhost:8080,http://127.0.0.1:8080,http://localhost:8082,http://127.0.0.1:8082}")
     private String[] allowedOrigins;
 
-    @Value("${app.cors.allowed-methods:GET,POST,PUT,DELETE,OPTIONS}")
+    @Value("${app.cors.allowed-methods:GET,POST,PUT,PATCH,DELETE,OPTIONS}")
     private String[] allowedMethods;
 
     // IMPORTANTE: agrega X-User-Id y Accept/Origin

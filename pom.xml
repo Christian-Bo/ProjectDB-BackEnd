@@ -117,7 +117,14 @@
 			<version>${openapi.version}</version>
 		</dependency>
 
-		<!-- Lombok: genera getters/setters/builders en compilación (requiere annotation processing) -->
+        <!-- Solo el módulo crypto para usar BCrypt y PasswordEncoder -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
+
+        <!-- Lombok: genera getters/setters/builders en compilación (requiere annotation processing) -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
