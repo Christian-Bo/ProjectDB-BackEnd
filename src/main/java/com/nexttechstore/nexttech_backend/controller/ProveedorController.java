@@ -11,7 +11,8 @@ import java.util.Map;
 
 /**
  * API REST para Proveedor (alineado a la convención de Marca).
- * Manejo de errores via exceptions globales ya existentes.
+ * - Excepciones: usa los handlers globales ya configurados.
+ * - CORS: habilitado de forma GLOBAL (CorsConfig), no se usa @CrossOrigin aquí.
  */
 @RestController
 @RequestMapping("/api/proveedores")
@@ -48,10 +49,7 @@ public class ProveedorController {
         return service.obtenerPorCodigo(codigo);
     }
 
-    /**
-     * Búsqueda con paginación manual.
-     * Ej: GET /api/proveedores?q=ferre&activo=true&page=0&size=20
-     */
+    /** Búsqueda con paginación manual. Ej: /api/proveedores?q=ferre&activo=true&page=0&size=20 */
     @GetMapping
     public Map<String, Object> buscar(
             @RequestParam(required = false) String q,
@@ -69,5 +67,11 @@ public class ProveedorController {
         resp.put("totalElements", total);
         resp.put("totalPages", (int) Math.ceil(total / (double) Math.max(size, 1)));
         return resp;
+    }
+
+    /** Listado mínimo de empleados activos para el combo del modal */
+    @GetMapping("/_empleados")
+    public List<Map<String, Object>> empleadosActivosMin() {
+        return service.listarEmpleadosActivosMin();
     }
 }

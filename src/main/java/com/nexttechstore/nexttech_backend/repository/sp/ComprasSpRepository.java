@@ -9,6 +9,7 @@ import com.nexttechstore.nexttech_backend.model.compras.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+
 import java.math.BigDecimal;
 
 // ====== IMPORTS JDBC EXPLÍCITOS (evitar java.sql.* para no chocar con java.util.Date) ======
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;           // Este es java.util.Date (firma pública)
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -35,7 +37,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Repositorio de acceso a SPs de Compras.
+ * Repositorio de acceso a SPs de Compras + catálogos para combos.
  *
  * Mantén los nombres de SPs y el tipo de TVP aquí en un solo lugar:
  *  - SP Listar:            dbo.sp_COMPRAS_Listar
@@ -47,8 +49,8 @@ import java.util.stream.Collectors;
  *  - SP QuitarDetalle:     dbo.sp_COMPRAS_QuitarDetalleLinea
  *  - SP Anular:            dbo.sp_COMPRAS_Anular
  *
- * Si cambias columnas devueltas por los SPs, ajusta los mappers (mapCabecera/mapDetalle)
- * y/o las columnas del TVP en crear()/agregarDetalle().
+ * NOTA: Para los combos, se usan consultas simples (read-only) directo a tablas,
+ *       sin alterar la lógica de negocio que vive en SPs.
  */
 @Repository
 public class ComprasSpRepository {
@@ -400,5 +402,78 @@ public class ComprasSpRepository {
                 ps -> ps.setInt(1, empleadoId),
                 rs -> rs.next() ? rs.getString("nombre") : null
         );
+    }
+
+    // =====================================================================
+    // =====================  C A T Á L O G O S  ===========================
+    // =====================================================================
+
+    // NOTA: Devolvemos List<Map<String,Object>> para NO crear DTOs nuevos.
+    //  Claves estándar: id, nombre (más campos útiles cuando aplique).
+
+    /** Catálogo de proveedores (opcional: solo activos) */
+    public List<Map<String,Object>> catalogoProveedores(Boolean soloActivos) {
+        String sql = "SELECT id, nombre, nit, activo FROM dbo.proveedores"
+                + (soloActivos != null && soloActivos ? " WHERE activo=1" : "")
+                + " ORDER BY nombre ASC";
+        return jdbc.query(sql, (rs, rowNum) -> {
+            Map<String,Object> m = new LinkedHashMap<>();
+            m.put("id", rs.getInt("id"));
+            m.put("nombre", rs.getString("nombre"));
+            m.put("nit", rs.getString("nit"));
+            m.put("activo", rs.getBoolean("activo"));
+            return m;
+        });
+    }
+
+    /** Catálogo de bodegas */
+    public List<Map<String,Object>> catalogoBodegas() {
+        String sql = "SELECT id, nombre, codigo FROM dbo.bodegas ORDER BY nombre ASC";
+        return jdbc.query(sql, (rs, rowNum) -> {
+            Map<String,Object> m = new LinkedHashMap<>();
+            m.put("id", rs.getInt("id"));
+            m.put("nombre", rs.getString("nombre"));
+            m.put("codigo", rs.getString("codigo"));
+            return m;
+        });
+    }
+
+    /** Catálogo de empleados (nombre completo) */
+    public List<Map<String,Object>> catalogoEmpleados() {
+        String sql = "SELECT id, (nombres + ' ' + apellidos) AS nombre, codigo_empleado FROM dbo.empleados ORDER BY nombre ASC";
+        return jdbc.query(sql, (rs, rowNum) -> {
+            Map<String,Object> m = new LinkedHashMap<>();
+            m.put("id", rs.getInt("id"));
+            m.put("nombre", rs.getString("nombre"));
+            m.put("codigo", rs.getString("codigo_empleado"));
+            return m;
+        });
+    }
+
+    /**
+     * Catálogo de productos con búsqueda por texto y límite.
+     * Busca por nombre (y si deseas por código, descomenta).
+     */
+    public List<Map<String,Object>> catalogoProductos(String texto, Integer limit) {
+        String base = "SELECT TOP (?) id, nombre /*, codigo*/ FROM dbo.productos ";
+        String where = (texto != null && !texto.isBlank()) ? "WHERE nombre LIKE ? /* OR codigo LIKE ? */ " : "";
+        String order = "ORDER BY nombre ASC";
+        return jdbc.query(con -> {
+            PreparedStatement ps = con.prepareStatement(base + where + order);
+            int idx = 1;
+            ps.setInt(idx++, (limit != null && limit > 0) ? limit : 50);
+            if (!where.isEmpty()) {
+                String like = "%" + texto.trim() + "%";
+                ps.setString(idx++, like);
+                // ps.setString(idx++, like); // si activas búsqueda por código
+            }
+            return ps;
+        }, (rs, rowNum) -> {
+            Map<String,Object> m = new LinkedHashMap<>();
+            m.put("id", rs.getInt("id"));
+            m.put("nombre", rs.getString("nombre"));
+            // m.put("codigo", rs.getString("codigo"));
+            return m;
+        });
     }
 }
