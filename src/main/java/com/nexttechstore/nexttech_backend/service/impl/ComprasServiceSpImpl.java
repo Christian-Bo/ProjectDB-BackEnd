@@ -24,7 +24,6 @@ public class ComprasServiceSpImpl implements ComprasService {
     }
 
     // ===== Compras (SPs) =====
-
     @Override
     @Transactional(readOnly = true)
     public List<CompraListItem> listar(Date fechaDel, Date fechaAl, Integer proveedorId, String estado, String texto) {
@@ -74,7 +73,6 @@ public class ComprasServiceSpImpl implements ComprasService {
     }
 
     // ===== Catálogos (read-only) =====
-
     @Override
     @Transactional(readOnly = true)
     public List<Map<String, Object>> catalogoProveedores(Boolean soloActivos) {
@@ -97,5 +95,12 @@ public class ComprasServiceSpImpl implements ComprasService {
     @Transactional(readOnly = true)
     public List<Map<String, Object>> catalogoProductos(String texto, Integer limit) {
         return repo.catalogoProductos(texto, limit);
+    }
+
+    // ===== Autofill producto (nuevo) =====
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> autoFillProducto(Integer productoId, Integer bodegaId) {
+        return repo.autoFillProducto(productoId, bodegaId);
     }
 }
