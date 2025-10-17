@@ -3,14 +3,12 @@ package com.nexttechstore.nexttech_backend.controller;
 import com.nexttechstore.nexttech_backend.dto.catalogos.BodegaDto;
 import com.nexttechstore.nexttech_backend.dto.catalogos.ClienteDto;
 import com.nexttechstore.nexttech_backend.dto.catalogos.ProductoStockDto;
+import com.nexttechstore.nexttech_backend.dto.catalogos.EmpleadoDto;
 import com.nexttechstore.nexttech_backend.repository.orm.CatalogosQueryRepository;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * Endpoints de catálogos para poblar selects del frontend (solo lectura).
- */
 @RestController
 @RequestMapping("/api/catalogos")
 public class CatalogosController {
@@ -36,8 +34,15 @@ public class CatalogosController {
         return repo.bodegas();
     }
 
+    // ✅ ahora acepta ?bodegaId= para filtrar por bodega
     @GetMapping("/productos-stock")
-    public List<ProductoStockDto> productosConStock() {
-        return repo.productosConStock();
+    public List<ProductoStockDto> productosConStock(@RequestParam(required = false) Integer bodegaId) {
+        return repo.productosConStock(bodegaId);
+    }
+
+    // ✅ catálogo de empleados (para Vendedor y Cajero)
+    @GetMapping("/empleados")
+    public List<EmpleadoDto> empleados() {
+        return repo.empleados();
     }
 }

@@ -10,6 +10,7 @@ import com.nexttechstore.nexttech_backend.dto.VentaRequestDto;
 import org.springframework.stereotype.Repository;
 
 import javax.sql.DataSource;
+import java.math.BigDecimal;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,75 +26,121 @@ public class VentasSpRepository {
         this.dataSource = dataSource;
     }
 
+    // ===== Helpers para leer columnas con alias distintos =====
+    private Integer readIntByAnyLabel(ResultSet rs, String... labels) throws SQLException {
+        for (String l : labels) {
+            try { return rs.getInt(l); } catch (SQLException ignore) {}
+        }
+        throw new SQLException("No se encontró ninguna de las columnas: " + String.join(",", labels));
+    }
+    private String readStringByAnyLabel(ResultSet rs, String... labels) throws SQLException {
+        for (String l : labels) {
+            try { return rs.getString(l); } catch (SQLException ignore) {}
+        }
+        throw new SQLException("No se encontró ninguna de las columnas: " + String.join(",", labels));
+    }
+
     /** Crea venta vía SP: dbo.sp_ventas_create (usa TVP v2 con lote/vence) */
     public int crearVenta(VentaRequestDto req) throws SQLException {
         if (req.getItems() == null || req.getItems().isEmpty()) {
             throw new SQLException("La venta debe tener al menos 1 ítem");
         }
+        if (req.getBodegaOrigenId() == null) {
+            throw new SQLException("Bodega de origen requerida");
+        }
+        if (req.getSerieId() == null) {
+            throw new SQLException("Serie requerida");
+        }
 
-        // bodegaOrigen se toma de la cabecera; si no viene, NO hacemos fallback a la bodega de ítems
         Integer bodegaOrigen = req.getBodegaOrigenId();
         Integer vendedorId   = (req.getVendedorId() != null) ? req.getVendedorId() : req.getUsuarioId();
         Integer cajeroId     = (req.getCajeroId()   != null) ? req.getCajeroId()   : req.getUsuarioId();
         String  tipoPago     = (req.getTipoPago()   != null && !req.getTipoPago().isBlank()) ? req.getTipoPago() : "C";
         boolean esCredito    = "R".equalsIgnoreCase(tipoPago);
 
-        // TVP detalle v2 (incluye lote y fecha_vencimiento)
+        // TVP detalle v2 (DECIMAL(19,4))
         SQLServerDataTable tvp = new SQLServerDataTable();
         tvp.addColumnMetadata("producto_id", Types.INTEGER);
-        tvp.addColumnMetadata("cantidad", Types.INTEGER);      // TVP v2 ==> INT
+        tvp.addColumnMetadata("cantidad", Types.INTEGER);
         tvp.addColumnMetadata("precio_unitario", Types.DECIMAL);
         tvp.addColumnMetadata("descuento_linea", Types.DECIMAL);
         tvp.addColumnMetadata("lote", Types.NVARCHAR);
         tvp.addColumnMetadata("fecha_vencimiento", Types.DATE);
 
         for (VentaItemDto it : req.getItems()) {
-            // cantidad INT: convierte del BigDecimal del DTO
             Integer cantInt = (it.getCantidad() != null) ? it.getCantidad().intValue() : null;
             if (cantInt == null) throw new SQLException("Cantidad requerida");
             if (cantInt < 1)     throw new SQLException("Cantidad debe ser mayor a 0");
 
-            java.math.BigDecimal desc = it.getDescuento() != null ? it.getDescuento() : java.math.BigDecimal.ZERO;
+            BigDecimal precio = it.getPrecioUnitario() != null ? it.getPrecioUnitario().setScale(4, BigDecimal.ROUND_HALF_UP) : null;
+            if (precio == null) throw new SQLException("Precio unitario requerido");
+
+            BigDecimal desc = it.getDescuento() != null ? it.getDescuento().setScale(4, BigDecimal.ROUND_HALF_UP) : null;
             java.sql.Date vence = (it.getFechaVencimiento() != null) ? java.sql.Date.valueOf(it.getFechaVencimiento()) : null;
 
             tvp.addRow(
                     it.getProductoId(),
                     cantInt,
-                    it.getPrecioUnitario(),
+                    precio,
                     desc,
                     it.getLote(),
                     vence
             );
         }
 
+        // Nota: tu SP puede terminar con:
+        //   SELECT @out_venta_id AS out_venta_id, @out_status_code AS code, @out_message AS msg;
+        // o con:
+        //   SELECT code = @out_status_code, message = @out_message, id = @out_venta_id;
+        // Este repo soporta ambas variantes.
         String sql =
                 "DECLARE @out_venta_id INT, @out_status_code INT, @out_message NVARCHAR(200); \n" +
                         "EXEC dbo.sp_ventas_create \n" +
                         "  @p_cliente_id=?, @p_bodega_origen_id=?, @p_serie_id=?, @p_vendedor_id=?, @p_cajero_id=?, \n" +
                         "  @p_tipo_pago=?, @p_descuento_general=?, @p_iva=?, @p_es_credito=?, @p_detalle=?, \n" +
                         "  @out_venta_id=@out_venta_id OUTPUT, @out_status_code=@out_status_code OUTPUT, @out_message=@out_message OUTPUT; \n" +
-                        "SELECT @out_venta_id AS out_venta_id, @out_status_code AS code, @out_message AS msg;";
+                        "SELECT @out_venta_id AS out_venta_id, @out_status_code AS code, @out_message AS msg;"; // fallback si el SP no hace SELECT al final
 
         try (Connection conn = dataSource.getConnection()) {
             SQLServerConnection sqlConn = conn.unwrap(SQLServerConnection.class);
             try (SQLServerPreparedStatement ps = (SQLServerPreparedStatement) sqlConn.prepareStatement(sql)) {
                 ps.setInt(1,  req.getClienteId());
-                if (bodegaOrigen == null) ps.setNull(2, Types.INTEGER); else ps.setInt(2, bodegaOrigen);
+                ps.setInt(2,  bodegaOrigen);
                 ps.setInt(3,  req.getSerieId());
                 ps.setInt(4,  vendedorId);
-                ps.setObject(5, cajeroId, Types.INTEGER);
+                if (cajeroId == null) ps.setNull(5, Types.INTEGER); else ps.setInt(5, cajeroId);
                 ps.setString(6, tipoPago);
-                ps.setBigDecimal(7, java.math.BigDecimal.ZERO);
-                ps.setBigDecimal(8, java.math.BigDecimal.ZERO);
+                ps.setBigDecimal(7, BigDecimal.ZERO.setScale(4)); // descuento_general
+                ps.setBigDecimal(8, BigDecimal.ZERO.setScale(4)); // iva
                 ps.setBoolean(9, esCredito);
-                ps.setStructured(10, "dbo.tvp_venta_detalle_v2", tvp); // ⬅️ TVP v2
+                ps.setStructured(10, "dbo.tvp_venta_detalle_v2", tvp);
 
                 try (ResultSet rs = ps.executeQuery()) {
                     if (!rs.next()) throw new SQLException("Sin resultado de sp_ventas_create");
-                    int outId   = rs.getInt("out_venta_id");
-                    int code    = rs.getInt("code");
-                    String msg  = rs.getString("msg");
-                    if (code != 0) throw new SQLException("SP sp_ventas_create error ("+code+"): " + msg);
+
+                    // Lee por cualquiera de los alias habituales
+                    int outId  = 0;
+                    int code   = 0;
+                    String msg = null;
+                    try {
+                        outId = readIntByAnyLabel(rs, "out_venta_id", "id", "venta_id");
+                        code  = readIntByAnyLabel(rs, "code", "status", "status_code");
+                        msg   = readStringByAnyLabel(rs, "msg", "message");
+                    } catch (SQLException incompatible) {
+                        // Si tu SP devolvió otro SELECT al final, avanza y vuelve a intentar
+                        while (ps.getMoreResults()) {
+                            try (ResultSet rs2 = ps.getResultSet()) {
+                                if (rs2 != null && rs2.next()) {
+                                    outId = readIntByAnyLabel(rs2, "out_venta_id", "id", "venta_id");
+                                    code  = readIntByAnyLabel(rs2, "code", "status", "status_code");
+                                    msg   = readStringByAnyLabel(rs2, "msg", "message");
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (code != 0) throw new SQLException("sp_ventas_create ("+code+"): " + msg);
                     if (outId <= 0) throw new SQLException("sp_ventas_create no devolvió id válido");
                     return outId;
                 }
@@ -117,7 +164,7 @@ public class VentasSpRepository {
                 if (!rs.next()) throw new SQLException("Sin resultado de sp_ventas_anular");
                 int code = rs.getInt("code");
                 String msg = rs.getString("msg");
-                if (code != 0) throw new SQLException("SP sp_ventas_anular error ("+code+"): " + msg);
+                if (code != 0) throw new SQLException("sp_ventas_anular ("+code+"): " + msg);
             }
         }
     }
@@ -163,18 +210,21 @@ public class VentasSpRepository {
         tvp.addColumnMetadata("precio_unitario", Types.DECIMAL);
         tvp.addColumnMetadata("descuento_linea", Types.DECIMAL);
         tvp.addColumnMetadata("accion", Types.CHAR);
-        tvp.addColumnMetadata("lote", Types.NVARCHAR);          // v2
-        tvp.addColumnMetadata("fecha_vencimiento", Types.DATE); // v2
+        tvp.addColumnMetadata("lote", Types.NVARCHAR);
+        tvp.addColumnMetadata("fecha_vencimiento", Types.DATE);
 
         for (VentaDetalleEditItemDto it : items) {
             java.sql.Date vence = (it.getFechaVencimiento() != null) ? java.sql.Date.valueOf(it.getFechaVencimiento()) : null;
+            BigDecimal precio = it.getPrecioUnitario() != null ? it.getPrecioUnitario().setScale(4, BigDecimal.ROUND_HALF_UP) : null;
+            BigDecimal desc   = it.getDescuentoLinea() != null ? it.getDescuentoLinea().setScale(4, BigDecimal.ROUND_HALF_UP) : null;
+
             tvp.addRow(
                     it.getDetalleId(),
                     it.getProductoId(),
                     it.getBodegaId(),
                     it.getCantidad(),
-                    it.getPrecioUnitario(),
-                    it.getDescuentoLinea(),
+                    precio,
+                    desc,
                     it.getAccion(),
                     it.getLote(),
                     vence
@@ -191,7 +241,7 @@ public class VentasSpRepository {
             SQLServerConnection sqlConn = conn.unwrap(SQLServerConnection.class);
             try (SQLServerPreparedStatement ps = (SQLServerPreparedStatement) sqlConn.prepareStatement(sql)) {
                 ps.setInt(1, ventaId);
-                ps.setStructured(2, "dbo.tvp_venta_detalle_edit_v2", tvp); // ⬅️ TVP v2
+                ps.setStructured(2, "dbo.tvp_venta_detalle_edit_v2", tvp);
 
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
@@ -206,7 +256,7 @@ public class VentasSpRepository {
         }
     }
 
-    /** GET by id: sp_ventas_get_by_id (RS1 header, RS2 detalle) */
+    /** GET by id */
     public Map<String, Object> getVentaById(int ventaId) throws SQLException {
         String sql = "EXEC dbo.sp_ventas_get_by_id @p_venta_id=?";
         try (Connection conn = dataSource.getConnection();
@@ -217,7 +267,6 @@ public class VentasSpRepository {
             Map<String, Object> header = null;
             var detalle = new ArrayList<Map<String,Object>>();
 
-            // RS1
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     header = new HashMap<>();
@@ -240,7 +289,6 @@ public class VentasSpRepository {
                 }
             }
 
-            // RS2
             if (ps.getMoreResults()) {
                 try (ResultSet rs2 = ps.getResultSet()) {
                     while (rs2.next()) {
@@ -253,8 +301,8 @@ public class VentasSpRepository {
                         row.put("precio_unitario", rs2.getBigDecimal("precio_unitario"));
                         row.put("descuento_linea", rs2.getBigDecimal("descuento_linea"));
                         row.put("subtotal", rs2.getBigDecimal("subtotal"));
-                        row.put("lote", rs2.getString("lote"));                          // NUEVO
-                        row.put("fecha_vencimiento", rs2.getDate("fecha_vencimiento"));  // NUEVO
+                        row.put("lote", rs2.getString("lote"));
+                        row.put("fecha_vencimiento", rs2.getDate("fecha_vencimiento"));
                         detalle.add(row);
                     }
                 }
@@ -270,7 +318,7 @@ public class VentasSpRepository {
         }
     }
 
-    /** Listar: sp_ventas_list (sin cambios de TVP) */
+    /** Listar */
     public List<Map<String,Object>> listarVentas(
             java.time.LocalDate desde,
             java.time.LocalDate hasta,

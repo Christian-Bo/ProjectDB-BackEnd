@@ -104,6 +104,16 @@ public class VentasServiceImpl implements VentasService {
                 item.setPrecioUnitario((java.math.BigDecimal) r.get("precio_unitario"));
                 item.setDescuentoLinea((java.math.BigDecimal) r.get("descuento_linea"));
                 item.setSubtotal((java.math.BigDecimal) r.get("subtotal"));
+
+                // NUEVO: lote y fecha de vencimiento si vienen
+                item.setLote((String) r.getOrDefault("lote", null));
+                Object fv2 = r.get("fecha_vencimiento");
+                if (fv2 instanceof java.sql.Date) {
+                    item.setFechaVencimiento(((java.sql.Date) fv2).toLocalDate());
+                } else if (fv2 instanceof java.sql.Timestamp) {
+                    item.setFechaVencimiento(((java.sql.Timestamp) fv2).toLocalDateTime().toLocalDate());
+                }
+
                 items.add(item);
             }
             dto.setItems(items);
@@ -119,7 +129,7 @@ public class VentasServiceImpl implements VentasService {
                                               Boolean incluirAnuladas,
                                               Integer page, Integer size) {
         try {
-            var rows = spRepo.listarVentas(desde, hasta, clienteId, numeroVenta, incluirAnuladas, page, size); // ⬅️ pasa el flag
+            var rows = spRepo.listarVentas(desde, hasta, clienteId, numeroVenta, incluirAnuladas, page, size);
             var list = new ArrayList<VentaResumenDto>();
             for (var r : rows) {
                 var v = new VentaResumenDto();

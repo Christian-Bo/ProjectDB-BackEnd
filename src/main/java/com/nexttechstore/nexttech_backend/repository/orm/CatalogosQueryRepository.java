@@ -2,6 +2,7 @@ package com.nexttechstore.nexttech_backend.repository.orm;
 
 import com.nexttechstore.nexttech_backend.dto.catalogos.BodegaDto;
 import com.nexttechstore.nexttech_backend.dto.catalogos.ClienteDto;
+import com.nexttechstore.nexttech_backend.dto.catalogos.EmpleadoDto;
 import com.nexttechstore.nexttech_backend.dto.catalogos.ProductoStockDto;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -18,9 +19,8 @@ public class CatalogosQueryRepository {
         this.jdbc = jdbc;
     }
 
-    // ClienteDto: (Integer id, String codigo, String nombre, String nit)
+    // ---- CLIENTES ----
     public List<ClienteDto> clientes() {
-        // NOTA: no filtramos por 'estado' porque en tu BD es VARCHAR ('A', ...) y/o puede no existir.
         String sql = """
             SELECT TOP 100 id, codigo, nombre, nit
             FROM dbo.clientes
@@ -34,9 +34,8 @@ public class CatalogosQueryRepository {
         ));
     }
 
-    // BodegaDto: (Integer id, String nombre, String direccion)
+    // ---- BODEGAS ----
     public List<BodegaDto> bodegas() {
-        // NOTA: tu tabla no tiene 'estado', así que no filtramos por esa columna.
         String sql = """
             SELECT id, nombre, direccion
             FROM dbo.bodegas
@@ -49,22 +48,46 @@ public class CatalogosQueryRepository {
         ));
     }
 
-    // ProductoStockDto: (Integer id, String codigo, String nombre, BigDecimal precioVenta, Integer stockDisponible)
-    public List<ProductoStockDto> productosConStock() {
-        // NOTA: evitamos filtrar por 'estado' en productos por si es VARCHAR o no existe.
-        //       Asumimos 'inventario.cantidad_actual' existe (lo usaste en otros SP).
+    // ---- EMPLEADOS (para Vendedor/Cajero) ----
+    public List<EmpleadoDto> empleados() {
         String sql = """
-            SELECT TOP 200
+            SELECT id, codigo, nombres, apellidos
+            FROM dbo.empleados
+            ORDER BY id
+            """;
+        return jdbc.query(sql, (rs, i) -> new EmpleadoDto(
+                rs.getInt("id"),
+                rs.getString("codigo"),
+                rs.getString("nombres"),
+                rs.getString("apellidos")
+        ));
+    }
+
+    // ---- PRODUCTOS CON STOCK (opcional por bodega) ----
+    public List<ProductoStockDto> productosConStock(Integer bodegaId) {
+        String base = """
+            SELECT TOP 500
                    p.id,
                    p.codigo,
                    p.nombre,
                    COALESCE(p.precio_venta, 0) AS precio_venta,
-                   i.cantidad_actual AS stock_disponible
-            FROM dbo.productos p
-            JOIN dbo.inventario i ON i.producto_id = p.id
-            ORDER BY p.id
+                   i.cantidad_actual          AS stock_disponible
+            FROM dbo.productos  AS p
+            JOIN dbo.inventario AS i ON i.producto_id = p.id
             """;
-        return jdbc.query(sql, (rs, i) -> new ProductoStockDto(
+        String sql = (bodegaId == null)
+                ? base + " ORDER BY p.id"
+                : base + " WHERE i.bodega_id = ? ORDER BY p.id";
+
+        return (bodegaId == null)
+                ? jdbc.query(sql, (rs, i) -> new ProductoStockDto(
+                rs.getInt("id"),
+                rs.getString("codigo"),
+                rs.getString("nombre"),
+                rs.getBigDecimal("precio_venta") != null ? rs.getBigDecimal("precio_venta") : BigDecimal.ZERO,
+                rs.getInt("stock_disponible")
+        ))
+                : jdbc.query(sql, ps -> ps.setInt(1, bodegaId), (rs, i) -> new ProductoStockDto(
                 rs.getInt("id"),
                 rs.getString("codigo"),
                 rs.getString("nombre"),
@@ -73,15 +96,8 @@ public class CatalogosQueryRepository {
         ));
     }
 
-    // Series para facturas (id, serie, correlativo "visible")
+    // ---- SERIES FACTURA ----
     public List<SerieItem> seriesFactura() {
-        /*
-         * Tu tabla no tiene 'correlativo' (exacto) o su nombre difiere.
-         * Para no fallar y aun así mostrar algo útil al front (id y serie),
-         * devolvemos 'correlativo' como 0 (constante). Si luego confirmas el
-         * nombre real (p.ej. 'numero_actual', 'correlativo_actual', etc.),
-         * reemplazamos ese 0 por la columna correcta.
-         */
         String sql = """
             SELECT id, serie, 0 AS correlativo
             FROM dbo.series_facturas
