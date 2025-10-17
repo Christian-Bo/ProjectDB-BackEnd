@@ -7,6 +7,7 @@ import com.nexttechstore.nexttech_backend.dto.VentaDetalleEditItemDto;
 import com.nexttechstore.nexttech_backend.dto.VentaHeaderEditDto;
 import com.nexttechstore.nexttech_backend.dto.VentaItemDto;
 import com.nexttechstore.nexttech_backend.dto.VentaRequestDto;
+import com.nexttechstore.nexttech_backend.exception.BadRequestException; // ⬅️ importa tu excepción 400
 import org.springframework.stereotype.Repository;
 
 import javax.sql.DataSource;
@@ -26,18 +27,44 @@ public class VentasSpRepository {
         this.dataSource = dataSource;
     }
 
-    // ===== Helpers para leer columnas con alias distintos =====
-    private Integer readIntByAnyLabel(ResultSet rs, String... labels) throws SQLException {
+    // ========= Helpers: lectura tolerante de columnas =========
+    private Integer readIntAny(ResultSet rs, String... labels) throws SQLException {
         for (String l : labels) {
-            try { return rs.getInt(l); } catch (SQLException ignore) {}
+            try {
+                Object o = rs.getObject(l);
+                if (o == null) continue;
+                if (o instanceof Number n) return n.intValue();
+                if (o instanceof String s && !s.isBlank()) return Integer.parseInt(s.trim());
+            } catch (SQLException ignore) { /* probar siguiente label */ }
         }
-        throw new SQLException("No se encontró ninguna de las columnas: " + String.join(",", labels));
+        throw new SQLException("No se encontró ninguna columna int: " + String.join(", ", labels));
     }
-    private String readStringByAnyLabel(ResultSet rs, String... labels) throws SQLException {
+
+    private String readStringAny(ResultSet rs, String... labels) throws SQLException {
         for (String l : labels) {
-            try { return rs.getString(l); } catch (SQLException ignore) {}
+            try {
+                String s = rs.getString(l);
+                if (s != null) return s;
+            } catch (SQLException ignore) { /* probar siguiente label */ }
         }
-        throw new SQLException("No se encontró ninguna de las columnas: " + String.join(",", labels));
+        return null;
+    }
+
+    private boolean tryReadOutRow(ResultSet rs, OutVars out) {
+        try {
+            out.id  = readIntAny(rs, "out_venta_id", "id", "venta_id");
+            out.code = readIntAny(rs, "code", "status", "status_code");
+            out.msg  = readStringAny(rs, "msg", "message", "detail");
+            return true;
+        } catch (SQLException e) {
+            return false;
+        }
+    }
+
+    private static class OutVars {
+        int id = 0;
+        int code = 0;
+        String msg = null;
     }
 
     /** Crea venta vía SP: dbo.sp_ventas_create (usa TVP v2 con lote/vence) */
@@ -45,12 +72,8 @@ public class VentasSpRepository {
         if (req.getItems() == null || req.getItems().isEmpty()) {
             throw new SQLException("La venta debe tener al menos 1 ítem");
         }
-        if (req.getBodegaOrigenId() == null) {
-            throw new SQLException("Bodega de origen requerida");
-        }
-        if (req.getSerieId() == null) {
-            throw new SQLException("Serie requerida");
-        }
+        if (req.getBodegaOrigenId() == null) throw new SQLException("Bodega de origen requerida");
+        if (req.getSerieId() == null)        throw new SQLException("Serie requerida");
 
         Integer bodegaOrigen = req.getBodegaOrigenId();
         Integer vendedorId   = (req.getVendedorId() != null) ? req.getVendedorId() : req.getUsuarioId();
@@ -58,7 +81,7 @@ public class VentasSpRepository {
         String  tipoPago     = (req.getTipoPago()   != null && !req.getTipoPago().isBlank()) ? req.getTipoPago() : "C";
         boolean esCredito    = "R".equalsIgnoreCase(tipoPago);
 
-        // TVP detalle v2 (DECIMAL(19,4))
+        // TVP detalle v2
         SQLServerDataTable tvp = new SQLServerDataTable();
         tvp.addColumnMetadata("producto_id", Types.INTEGER);
         tvp.addColumnMetadata("cantidad", Types.INTEGER);
@@ -67,39 +90,32 @@ public class VentasSpRepository {
         tvp.addColumnMetadata("lote", Types.NVARCHAR);
         tvp.addColumnMetadata("fecha_vencimiento", Types.DATE);
 
-        for (VentaItemDto it : req.getItems()) {
+        for (var it : req.getItems()) {
             Integer cantInt = (it.getCantidad() != null) ? it.getCantidad().intValue() : null;
-            if (cantInt == null) throw new SQLException("Cantidad requerida");
-            if (cantInt < 1)     throw new SQLException("Cantidad debe ser mayor a 0");
-
-            BigDecimal precio = it.getPrecioUnitario() != null ? it.getPrecioUnitario().setScale(4, BigDecimal.ROUND_HALF_UP) : null;
+            if (cantInt == null || cantInt < 1) throw new SQLException("Cantidad inválida");
+            BigDecimal precio = it.getPrecioUnitario();
             if (precio == null) throw new SQLException("Precio unitario requerido");
 
-            BigDecimal desc = it.getDescuento() != null ? it.getDescuento().setScale(4, BigDecimal.ROUND_HALF_UP) : null;
+            BigDecimal desc  = it.getDescuento();
             java.sql.Date vence = (it.getFechaVencimiento() != null) ? java.sql.Date.valueOf(it.getFechaVencimiento()) : null;
 
             tvp.addRow(
                     it.getProductoId(),
                     cantInt,
-                    precio,
-                    desc,
+                    precio.setScale(4, BigDecimal.ROUND_HALF_UP),
+                    (desc == null ? null : desc.setScale(4, BigDecimal.ROUND_HALF_UP)),
                     it.getLote(),
                     vence
             );
         }
 
-        // Nota: tu SP puede terminar con:
-        //   SELECT @out_venta_id AS out_venta_id, @out_status_code AS code, @out_message AS msg;
-        // o con:
-        //   SELECT code = @out_status_code, message = @out_message, id = @out_venta_id;
-        // Este repo soporta ambas variantes.
         String sql =
                 "DECLARE @out_venta_id INT, @out_status_code INT, @out_message NVARCHAR(200); \n" +
                         "EXEC dbo.sp_ventas_create \n" +
                         "  @p_cliente_id=?, @p_bodega_origen_id=?, @p_serie_id=?, @p_vendedor_id=?, @p_cajero_id=?, \n" +
                         "  @p_tipo_pago=?, @p_descuento_general=?, @p_iva=?, @p_es_credito=?, @p_detalle=?, \n" +
                         "  @out_venta_id=@out_venta_id OUTPUT, @out_status_code=@out_status_code OUTPUT, @out_message=@out_message OUTPUT; \n" +
-                        "SELECT @out_venta_id AS out_venta_id, @out_status_code AS code, @out_message AS msg;"; // fallback si el SP no hace SELECT al final
+                        "SELECT @out_venta_id AS out_venta_id, @out_status_code AS code, @out_message AS msg;";
 
         try (Connection conn = dataSource.getConnection()) {
             SQLServerConnection sqlConn = conn.unwrap(SQLServerConnection.class);
@@ -115,35 +131,29 @@ public class VentasSpRepository {
                 ps.setBoolean(9, esCredito);
                 ps.setStructured(10, "dbo.tvp_venta_detalle_v2", tvp);
 
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (!rs.next()) throw new SQLException("Sin resultado de sp_ventas_create");
+                OutVars out = new OutVars();
 
-                    // Lee por cualquiera de los alias habituales
-                    int outId  = 0;
-                    int code   = 0;
-                    String msg = null;
-                    try {
-                        outId = readIntByAnyLabel(rs, "out_venta_id", "id", "venta_id");
-                        code  = readIntByAnyLabel(rs, "code", "status", "status_code");
-                        msg   = readStringByAnyLabel(rs, "msg", "message");
-                    } catch (SQLException incompatible) {
-                        // Si tu SP devolvió otro SELECT al final, avanza y vuelve a intentar
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next() && tryReadOutRow(rs, out)) {
+                        // ok
+                    } else {
+                        boolean found = false;
                         while (ps.getMoreResults()) {
                             try (ResultSet rs2 = ps.getResultSet()) {
-                                if (rs2 != null && rs2.next()) {
-                                    outId = readIntByAnyLabel(rs2, "out_venta_id", "id", "venta_id");
-                                    code  = readIntByAnyLabel(rs2, "code", "status", "status_code");
-                                    msg   = readStringByAnyLabel(rs2, "msg", "message");
-                                    break;
-                                }
+                                if (rs2 != null && rs2.next() && tryReadOutRow(rs2, out)) { found = true; break; }
                             }
                         }
+                        if (!found) throw new SQLException("sp_ventas_create no devolvió columnas de salida esperadas");
                     }
-
-                    if (code != 0) throw new SQLException("sp_ventas_create ("+code+"): " + msg);
-                    if (outId <= 0) throw new SQLException("sp_ventas_create no devolvió id válido");
-                    return outId;
                 }
+
+                // 🔴 MAPEOS A 400: códigos de negocio desde el SP
+                if (out.code == 1403) throw new BadRequestException(out.msg != null ? out.msg : "Stock insuficiente");
+                if (out.code == 1404) throw new BadRequestException(out.msg != null ? out.msg : "Conflicto de concurrencia");
+
+                if (out.code != 0) throw new SQLException("sp_ventas_create (" + out.code + "): " + out.msg);
+                if (out.id <= 0)   throw new SQLException("sp_ventas_create no devolvió id válido");
+                return out.id;
             }
         }
     }
@@ -164,12 +174,12 @@ public class VentasSpRepository {
                 if (!rs.next()) throw new SQLException("Sin resultado de sp_ventas_anular");
                 int code = rs.getInt("code");
                 String msg = rs.getString("msg");
-                if (code != 0) throw new SQLException("sp_ventas_anular ("+code+"): " + msg);
+                if (code != 0) throw new SQLException("sp_ventas_anular (" + code + "): " + msg);
             }
         }
     }
 
-    /** Edita cabecera: dbo.sp_ventas_edit_header */
+    /** Edita cabecera */
     public void editarHeader(int ventaId, VentaHeaderEditDto dto) throws SQLException {
         String sql =
                 "DECLARE @out_status INT, @out_msg NVARCHAR(200); " +
@@ -200,7 +210,7 @@ public class VentasSpRepository {
         }
     }
 
-    /** Edita detalle: dbo.sp_ventas_edit_detalle (usa TVP v2 con lote/vence) */
+    /** Edita detalle (TVP v2) */
     public void editarDetalle(int ventaId, List<VentaDetalleEditItemDto> items) throws SQLException {
         SQLServerDataTable tvp = new SQLServerDataTable();
         tvp.addColumnMetadata("detalle_id", Types.INTEGER);
@@ -215,16 +225,16 @@ public class VentasSpRepository {
 
         for (VentaDetalleEditItemDto it : items) {
             java.sql.Date vence = (it.getFechaVencimiento() != null) ? java.sql.Date.valueOf(it.getFechaVencimiento()) : null;
-            BigDecimal precio = it.getPrecioUnitario() != null ? it.getPrecioUnitario().setScale(4, BigDecimal.ROUND_HALF_UP) : null;
-            BigDecimal desc   = it.getDescuentoLinea() != null ? it.getDescuentoLinea().setScale(4, BigDecimal.ROUND_HALF_UP) : null;
+            BigDecimal precio = it.getPrecioUnitario();
+            BigDecimal desc   = it.getDescuentoLinea();
 
             tvp.addRow(
                     it.getDetalleId(),
                     it.getProductoId(),
                     it.getBodegaId(),
                     it.getCantidad(),
-                    precio,
-                    desc,
+                    (precio == null ? null : precio.setScale(4, BigDecimal.ROUND_HALF_UP)),
+                    (desc   == null ? null : desc.setScale(4, BigDecimal.ROUND_HALF_UP)),
                     it.getAccion(),
                     it.getLote(),
                     vence
@@ -256,7 +266,7 @@ public class VentasSpRepository {
         }
     }
 
-    /** GET by id */
+    /** GET by id (RS1 header, RS2 detalle) */
     public Map<String, Object> getVentaById(int ventaId) throws SQLException {
         String sql = "EXEC dbo.sp_ventas_get_by_id @p_venta_id=?";
         try (Connection conn = dataSource.getConnection();
@@ -308,9 +318,8 @@ public class VentasSpRepository {
                 }
             }
 
-            if (header == null) {
-                throw new SQLException("Venta no encontrada id=" + ventaId);
-            }
+            if (header == null) throw new SQLException("Venta no encontrada id=" + ventaId);
+
             Map<String,Object> out = new HashMap<>();
             out.put("header", header);
             out.put("detalle", detalle);

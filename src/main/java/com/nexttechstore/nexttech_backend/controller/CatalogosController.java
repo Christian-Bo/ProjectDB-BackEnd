@@ -34,7 +34,7 @@ public class CatalogosController {
         return repo.bodegas();
     }
 
-    // ✅ ahora acepta ?bodegaId= para filtrar por bodega
+    // ✅ acepta ?bodegaId= para filtrar por bodega; si no se envía, devuelve stock total
     @GetMapping("/productos-stock")
     public List<ProductoStockDto> productosConStock(@RequestParam(required = false) Integer bodegaId) {
         return repo.productosConStock(bodegaId);

@@ -1,6 +1,7 @@
 package com.nexttechstore.nexttech_backend.service.impl;
 
 import com.nexttechstore.nexttech_backend.dto.*;
+import com.nexttechstore.nexttech_backend.exception.BadRequestException;
 import com.nexttechstore.nexttech_backend.repository.sp.VentasSpRepository;
 import com.nexttechstore.nexttech_backend.service.api.VentasService;
 import org.springframework.stereotype.Service;
@@ -25,7 +26,11 @@ public class VentasServiceImpl implements VentasService {
     public int registrar(VentaRequestDto req) {
         try {
             return spRepo.crearVenta(req);
+        } catch (BadRequestException ex) {
+            // ❗️Deja pasar 400 (stock insuficiente, concurrencia, etc.)
+            throw ex;
         } catch (Exception ex) {
+            // Otros errores reales => 500
             throw new RuntimeException(ex.getMessage(), ex);
         }
     }
@@ -35,6 +40,8 @@ public class VentasServiceImpl implements VentasService {
     public void anular(int ventaId, String motivo) {
         try {
             spRepo.anularVenta(ventaId, motivo);
+        } catch (BadRequestException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new RuntimeException(ex.getMessage(), ex);
         }
@@ -45,6 +52,8 @@ public class VentasServiceImpl implements VentasService {
     public void editarHeader(int ventaId, VentaHeaderEditDto dto) {
         try {
             spRepo.editarHeader(ventaId, dto);
+        } catch (BadRequestException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new RuntimeException(ex.getMessage(), ex);
         }
@@ -55,6 +64,8 @@ public class VentasServiceImpl implements VentasService {
     public void editarDetalle(int ventaId, List<VentaDetalleEditItemDto> items) {
         try {
             spRepo.editarDetalle(ventaId, items);
+        } catch (BadRequestException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new RuntimeException(ex.getMessage(), ex);
         }
@@ -84,10 +95,8 @@ public class VentasServiceImpl implements VentasService {
             dto.setDescuentoGeneral((java.math.BigDecimal) h.get("descuento_general"));
             dto.setIva((java.math.BigDecimal) h.get("iva"));
             dto.setTotal((java.math.BigDecimal) h.get("total"));
-
             dto.setEstado((String) h.get("estado"));
             dto.setTipoPago((String) h.get("tipo_pago"));
-
             dto.setObservaciones((String) h.get("observaciones"));
             dto.setClienteId((Integer) h.get("cliente_id"));
             dto.setClienteNombre((String) h.getOrDefault("cliente_nombre", null));
@@ -104,20 +113,12 @@ public class VentasServiceImpl implements VentasService {
                 item.setPrecioUnitario((java.math.BigDecimal) r.get("precio_unitario"));
                 item.setDescuentoLinea((java.math.BigDecimal) r.get("descuento_linea"));
                 item.setSubtotal((java.math.BigDecimal) r.get("subtotal"));
-
-                // NUEVO: lote y fecha de vencimiento si vienen
-                item.setLote((String) r.getOrDefault("lote", null));
-                Object fv2 = r.get("fecha_vencimiento");
-                if (fv2 instanceof java.sql.Date) {
-                    item.setFechaVencimiento(((java.sql.Date) fv2).toLocalDate());
-                } else if (fv2 instanceof java.sql.Timestamp) {
-                    item.setFechaVencimiento(((java.sql.Timestamp) fv2).toLocalDateTime().toLocalDate());
-                }
-
                 items.add(item);
             }
             dto.setItems(items);
             return dto;
+        } catch (BadRequestException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new RuntimeException(ex.getMessage(), ex);
         }
@@ -151,6 +152,8 @@ public class VentasServiceImpl implements VentasService {
                 list.add(v);
             }
             return list;
+        } catch (BadRequestException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new RuntimeException(ex.getMessage(), ex);
         }

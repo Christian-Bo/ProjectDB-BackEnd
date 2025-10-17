@@ -65,29 +65,47 @@ public class CatalogosQueryRepository {
 
     // ---- PRODUCTOS CON STOCK (opcional por bodega) ----
     public List<ProductoStockDto> productosConStock(Integer bodegaId) {
-        String base = """
+
+        // Caso A: SIN bodega -> stock total (SUM) por producto
+        if (bodegaId == null) {
+            String sql = """
+                SELECT TOP 500
+                       p.id,
+                       p.codigo,
+                       p.nombre,
+                       COALESCE(p.precio_venta, 0) AS precio_venta,
+                       COALESCE(SUM(i.cantidad_actual), 0) AS stock_disponible
+                FROM dbo.productos  AS p
+                LEFT JOIN dbo.inventario AS i
+                  ON i.producto_id = p.id
+                GROUP BY p.id, p.codigo, p.nombre, p.precio_venta
+                ORDER BY p.nombre
+                """;
+            return jdbc.query(sql, (rs, i) -> new ProductoStockDto(
+                    rs.getInt("id"),
+                    rs.getString("codigo"),
+                    rs.getString("nombre"),
+                    rs.getBigDecimal("precio_venta") != null ? rs.getBigDecimal("precio_venta") : BigDecimal.ZERO,
+                    rs.getInt("stock_disponible")
+            ));
+        }
+
+        // Caso B: CON bodega -> stock específico de esa bodega
+        String sql = """
             SELECT TOP 500
                    p.id,
                    p.codigo,
                    p.nombre,
                    COALESCE(p.precio_venta, 0) AS precio_venta,
-                   i.cantidad_actual          AS stock_disponible
+                   COALESCE(i.cantidad_actual, 0) AS stock_disponible
             FROM dbo.productos  AS p
-            JOIN dbo.inventario AS i ON i.producto_id = p.id
+            LEFT JOIN dbo.inventario AS i
+              ON i.producto_id = p.id
+             AND i.bodega_id   = ?
+            ORDER BY p.nombre
             """;
-        String sql = (bodegaId == null)
-                ? base + " ORDER BY p.id"
-                : base + " WHERE i.bodega_id = ? ORDER BY p.id";
 
-        return (bodegaId == null)
-                ? jdbc.query(sql, (rs, i) -> new ProductoStockDto(
-                rs.getInt("id"),
-                rs.getString("codigo"),
-                rs.getString("nombre"),
-                rs.getBigDecimal("precio_venta") != null ? rs.getBigDecimal("precio_venta") : BigDecimal.ZERO,
-                rs.getInt("stock_disponible")
-        ))
-                : jdbc.query(sql, ps -> ps.setInt(1, bodegaId), (rs, i) -> new ProductoStockDto(
+        return jdbc.query(sql, ps -> ps.setInt(1, bodegaId), (rs, i) -> new ProductoStockDto(
                 rs.getInt("id"),
                 rs.getString("codigo"),
                 rs.getString("nombre"),
