@@ -12,18 +12,18 @@ public class VentaItemDto {
     @NotNull
     private Integer productoId;
 
-    @NotNull
+    // Ya NO requerido al crear (lo dejamos por compatibilidad pero sin @NotNull)
     private Integer bodegaId;
 
     @NotNull
-    private BigDecimal cantidad;
+    private BigDecimal cantidad;       // OJO: tu TVP v2 espera INT; convertimos en el repo
 
     @NotNull
     private BigDecimal precioUnitario;
 
     // Opcionales
     private BigDecimal descuento;        // por línea
-    private BigDecimal impuesto;         // por línea (si lo usas después)
-    private String lote;                 // NUEVO: para no devolver null
-    private LocalDate fechaVencimiento;  // NUEVO: si aplica (productos con vencimiento)
+    private BigDecimal impuesto;         // si lo usas después
+    private String lote;                 // NUEVO: se guarda en detalle_ventas.lote
+    private LocalDate fechaVencimiento;  // NUEVO: se guarda en detalle_ventas.fecha_vencimiento
 }

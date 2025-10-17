@@ -64,34 +64,46 @@ public class VentasServiceImpl implements VentasService {
     public VentaDto obtenerVentaPorId(int id) {
         try {
             Map<String,Object> data = spRepo.getVentaById(id);
+            @SuppressWarnings("unchecked")
             Map<String,Object> h = (Map<String,Object>) data.get("header");
+            @SuppressWarnings("unchecked")
             List<Map<String,Object>> d = (List<Map<String,Object>>) data.get("detalle");
 
             VentaDto dto = new VentaDto();
             dto.setId((Integer) h.get("id"));
             dto.setNumeroVenta((String) h.get("numero_venta"));
-            dto.setFechaVenta(((java.sql.Date) h.get("fecha_venta")).toLocalDate());
+
+            Object fv = h.get("fecha_venta");
+            if (fv instanceof java.sql.Date) {
+                dto.setFechaVenta(((java.sql.Date) fv).toLocalDate());
+            } else if (fv instanceof java.sql.Timestamp) {
+                dto.setFechaVenta(((java.sql.Timestamp) fv).toLocalDateTime().toLocalDate());
+            }
+
             dto.setSubtotal((java.math.BigDecimal) h.get("subtotal"));
             dto.setDescuentoGeneral((java.math.BigDecimal) h.get("descuento_general"));
             dto.setIva((java.math.BigDecimal) h.get("iva"));
             dto.setTotal((java.math.BigDecimal) h.get("total"));
+
+            dto.setEstado((String) h.get("estado"));
             dto.setTipoPago((String) h.get("tipo_pago"));
+
             dto.setObservaciones((String) h.get("observaciones"));
             dto.setClienteId((Integer) h.get("cliente_id"));
             dto.setClienteNombre((String) h.getOrDefault("cliente_nombre", null));
+            dto.setVendedorId((Integer) h.getOrDefault("vendedor_id", null));
+            dto.setCajeroId((Integer) h.getOrDefault("cajero_id", null));
+            dto.setBodegaOrigenId((Integer) h.getOrDefault("bodega_origen_id", null));
 
-            // Detalle (ajustado a tu VentaDetalleDto actual)
             List<VentaDetalleDto> items = new ArrayList<>();
             for (var r : d) {
                 VentaDetalleDto item = new VentaDetalleDto();
                 item.setId((Integer) r.get("detalle_id"));
                 item.setProductoId((Integer) r.get("producto_id"));
-                // cantidad es Integer en tu DTO
                 item.setCantidad((Integer) r.get("cantidad"));
                 item.setPrecioUnitario((java.math.BigDecimal) r.get("precio_unitario"));
                 item.setDescuentoLinea((java.math.BigDecimal) r.get("descuento_linea"));
                 item.setSubtotal((java.math.BigDecimal) r.get("subtotal"));
-                // lote / fecha_vencimiento no vienen en el SP de lectura => los dejamos null
                 items.add(item);
             }
             dto.setItems(items);
@@ -104,18 +116,28 @@ public class VentasServiceImpl implements VentasService {
     @Override
     public List<VentaResumenDto> listarVentas(LocalDate desde, LocalDate hasta,
                                               Integer clienteId, String numeroVenta,
+                                              Boolean incluirAnuladas,
                                               Integer page, Integer size) {
         try {
-            var rows = spRepo.listarVentas(desde, hasta, clienteId, numeroVenta, page, size);
+            var rows = spRepo.listarVentas(desde, hasta, clienteId, numeroVenta, incluirAnuladas, page, size); // ⬅️ pasa el flag
             var list = new ArrayList<VentaResumenDto>();
             for (var r : rows) {
                 var v = new VentaResumenDto();
                 v.setId((Integer) r.get("id"));
                 v.setNumeroVenta((String) r.get("numero_venta"));
-                v.setFechaVenta(((java.sql.Date) r.get("fecha_venta")).toLocalDate());
+
+                Object fv = r.get("fecha_venta");
+                if (fv instanceof java.sql.Date) {
+                    v.setFechaVenta(((java.sql.Date) fv).toLocalDate());
+                } else if (fv instanceof java.sql.Timestamp) {
+                    v.setFechaVenta(((java.sql.Timestamp) fv).toLocalDateTime().toLocalDate());
+                }
+
                 v.setTotal((java.math.BigDecimal) r.get("total"));
                 v.setClienteId((Integer) r.get("cliente_id"));
                 v.setClienteNombre((String) r.get("cliente_nombre"));
+                v.setEstado((String) r.get("estado"));
+                v.setTipoPago((String) r.get("tipo_pago"));
                 list.add(v);
             }
             return list;

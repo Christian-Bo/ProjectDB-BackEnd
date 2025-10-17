@@ -47,17 +47,18 @@ public class VentasController {
         return Map.of("ventaId", id, "status", "OK", "items", items.size());
     }
 
-    // (Lectura – aún no implementadas)
+    // LISTAR
     @GetMapping
     public List<VentaResumenDto> listar(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
             @RequestParam(required = false) Integer clienteId,
             @RequestParam(required = false) String numeroVenta,
+            @RequestParam(required = false, defaultValue = "false") Boolean incluirAnuladas, // ⬅️ NUEVO
             @RequestParam(required = false, defaultValue = "0") Integer page,
             @RequestParam(required = false, defaultValue = "50") Integer size
     ) {
-        return service.listarVentas(desde, hasta, clienteId, numeroVenta, page, size);
+        return service.listarVentas(desde, hasta, clienteId, numeroVenta, incluirAnuladas, page, size);
     }
 
     @GetMapping("/{id}")
