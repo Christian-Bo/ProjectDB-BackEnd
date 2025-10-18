@@ -4,6 +4,7 @@ import com.nexttechstore.nexttech_backend.dto.ProveedorDto;
 import com.nexttechstore.nexttech_backend.service.api.ProveedorService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
+import com.nexttechstore.nexttech_backend.security.AllowedRoles;
 
 import java.util.HashMap;
 import java.util.List;
@@ -14,8 +15,10 @@ import java.util.Map;
  * - Excepciones: usa los handlers globales ya configurados.
  * - CORS: habilitado de forma GLOBAL (CorsConfig), no se usa @CrossOrigin aquí.
  */
+@AllowedRoles({"OPERACIONES"})
 @RestController
 @RequestMapping("/api/proveedores")
+
 public class ProveedorController {
 
     private final ProveedorService service;

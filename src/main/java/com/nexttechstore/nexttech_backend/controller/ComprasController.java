@@ -1,6 +1,7 @@
 package com.nexttechstore.nexttech_backend.controller;
 
 import com.nexttechstore.nexttech_backend.model.compras.*;
+import com.nexttechstore.nexttech_backend.security.AllowedRoles;
 import com.nexttechstore.nexttech_backend.service.api.ComprasService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -15,6 +16,7 @@ import java.util.Map;
  * Convención: la lógica vive en SPs; el controlador valida y pasa el payload.
  * Catálogos se leen desde sp_COMPRAS_Lookups y catálogos específicos.
  */
+@AllowedRoles({"OPERACIONES"})
 @RestController
 @RequestMapping("/api/compras")
 public class ComprasController {

@@ -3,6 +3,8 @@ package com.nexttechstore.nexttech_backend.controller;
 import com.nexttechstore.nexttech_backend.dto.PagoRequestDto;
 import com.nexttechstore.nexttech_backend.repository.sp.CxcSpRepository;
 import com.nexttechstore.nexttech_backend.service.impl.CxcServiceImpl;
+import com.nexttechstore.nexttech_backend.security.AllowedRoles;
+import com.nexttechstore.nexttech_backend.service.api.CxcService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +15,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
+@AllowedRoles({"FINANZAS"})
 @RestController
 @RequestMapping("/api/cxc")
 public class CxcController {

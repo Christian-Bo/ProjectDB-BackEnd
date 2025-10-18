@@ -1,6 +1,5 @@
 package com.nexttechstore.nexttech_backend.service.impl;
 
-
 import com.nexttechstore.nexttech_backend.dto.*;
 import com.nexttechstore.nexttech_backend.model.entity.UsuarioEntity;
 import com.nexttechstore.nexttech_backend.repository.orm.UsuarioJpaRepository;
@@ -53,7 +52,8 @@ public class AuthServiceImpl implements AuthService {
                 user.getRol().getId(),
                 user.getRol().getNombre()
         );
-        return new LoginResponse(token, session.expiresAt, dto);
+        // 👇 usar getter de expiresAt
+        return new LoginResponse(token, session.getExpiresAt(), dto);
     }
 
     @Override
@@ -63,7 +63,8 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Token inválido o expirado");
         }
         var s = sessionManager.get(request.token());
-        var dto = new UserDto(null, null, null, null, s.rolId, s.rolNombre);
+        // 👇 usar getters de rol
+        var dto = new UserDto(null, null, null, null, s.getRolId(), s.getRolNombre());
         return new LoginResponse(request.token(), newExp, dto);
     }
 
@@ -82,7 +83,7 @@ public class AuthServiceImpl implements AuthService {
         var s = sessionManager.get(token);
         if (s == null) throw new IllegalArgumentException("Token inválido o expirado");
 
-        // No recargamos de BD cada vez; si necesitas, puedes hacerlo con usuarioRepo.findById(s.userId)
-        return new UserDto(s.userId, null, "A", null, s.rolId, s.rolNombre);
+        // 👇 usar getters de session
+        return new UserDto(s.getUserId(), null, "A", null, s.getRolId(), s.getRolNombre());
     }
 }
