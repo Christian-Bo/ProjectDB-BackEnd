@@ -12,6 +12,10 @@ import java.time.LocalDate;
  * Línea de detalle de la compra.
  * Si agregas columnas nuevas en tus SPs (ej. bonificación, impuestos línea),
  * agrégalas aquí y en el mapper del repositorio.
+ *
+ * Campos nuevos:
+ *  - productoCodigo   → mapeado desde los SPs (alias: producto_codigo)
+ *  - unidadMedida     → mapeado desde los SPs (alias: unidad_medida)
  */
 @Data
 @Builder
@@ -25,8 +29,10 @@ public class CompraDetalle {
     // FK producto
     private Integer productoId;
 
-    // Enriquecimiento informativo
+    // Enriquecimiento informativo (devueltos por los SPs para autollenado/UX)
     private String productoNombre;
+    private String productoCodigo;   // <- NUEVO (repo: d.setProductoCodigo(...))
+    private String unidadMedida;     // <- NUEVO (repo: d.setUnidadMedida(...))
 
     private Integer cantidadPedida;
     private Integer cantidadRecibida;

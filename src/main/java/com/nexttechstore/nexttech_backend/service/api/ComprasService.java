@@ -6,10 +6,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Contrato del servicio de Compras.
- * No implementa negocio: solo orquesta llamadas al repositorio de SPs.
- */
+/** Contrato del servicio de Compras. */
 public interface ComprasService {
 
     // ===== Compras (SPs) =====
@@ -29,7 +26,7 @@ public interface ComprasService {
 
     int anular(CompraAnularRequest req);
 
-    // ===== Catálogos para combos (sin crear DTOs nuevos) =====
+    // ===== Catálogos para combos =====
     List<Map<String,Object>> catalogoProveedores(Boolean soloActivos);
 
     List<Map<String,Object>> catalogoBodegas();
@@ -37,4 +34,7 @@ public interface ComprasService {
     List<Map<String,Object>> catalogoEmpleados();
 
     List<Map<String,Object>> catalogoProductos(String texto, Integer limit);
+
+    // ===== Autofill producto para detalle =====
+    Map<String,Object> autoFillProducto(Integer productoId, Integer bodegaId);
 }
