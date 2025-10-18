@@ -1,250 +1,197 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  POM del proyecto NextTech Backend
-  - Spring Boot 3.5.6 (Java 17)
-  - SQL Server (mssql-jdbc) con uso de tipos específicos del driver (TVP)
-  - OpenAPI (Swagger), JasperReports, OpenHTML, MapStruct, Lombok
--->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
-	<!-- Versión del modelo de POM -->
-	<modelVersion>4.0.0</modelVersion>
+    <!-- ========================= -->
+    <!--  Spring Boot Base         -->
+    <!-- ========================= -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.3.4</version>
+        <relativePath/>
+    </parent>
 
-	<!--
-      Parent de Spring Boot:
-      - Provee BOM (dependency management) para alinear versiones de librerías compatibles con Boot 3.5.6.
-      - Evita que tengas que fijar versiones en la mayoría de starters.
-    -->
-	<parent>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.5.6</version>
-		<relativePath/>
-	</parent>
+    <groupId>com.nexttechstore</groupId>
+    <artifactId>nexttech-backend</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>nexttech-backend</name>
+    <description>Backend Spring Boot con SQL Server, Jasper y Swagger</description>
 
-	<!-- Identidad del artefacto -->
-	<groupId>com.nexttechstore</groupId>
-	<artifactId>nexttech-backend</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
-	<name>nexttech-backend</name>
-	<description>Backend Spring Boot con SQL Server y reportes PDF</description>
+    <properties>
+        <java.version>17</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-	<!--
-      PROPIEDADES GLOBALES
-      - Centralizan versiones para reusarlas y actualizarlas desde un solo lugar.
-    -->
-	<properties>
-		<!-- Versión de Java (coincidir con toolchain/IDE) -->
-		<java.version>17</java.version>
+        <!-- Versiones de librerías -->
+        <openapi.version>2.6.0</openapi.version>
+        <mssqljdbc.version>13.2.0.jre11</mssqljdbc.version>
+        <jasper.version>6.21.3</jasper.version>
+        <openhtml.version>1.0.10</openhtml.version>
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
+    </properties>
 
-		<!-- Mapeo y generación de código para DTOs -->
-		<mapstruct.version>1.5.5.Final</mapstruct.version>
+    <!-- ========================= -->
+    <!--  Dependencias principales -->
+    <!-- ========================= -->
+    <dependencies>
 
-		<!-- UI de OpenAPI/Swagger para MVC -->
-		<openapi.version>2.6.0</openapi.version>
+        <!-- Web / MVC -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
 
-		<!-- Driver SQL Server (elige jre11 para Java 11+; funciona con Java 17) -->
-		<mssqljdbc.version>13.2.0.jre11</mssqljdbc.version>
+        <!-- Validaciones -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
 
-		<!-- Reportes Jasper -->
-		<jasper.version>6.21.3</jasper.version>
+        <!-- JPA / Hibernate -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
 
-		<!-- Render HTML→PDF (PDFBox) -->
-		<openhtml.version>1.0.10</openhtml.version>
-	</properties>
+        <!-- Driver SQL Server -->
+        <dependency>
+            <groupId>com.microsoft.sqlserver</groupId>
+            <artifactId>mssql-jdbc</artifactId>
+            <version>${mssqljdbc.version}</version>
+        </dependency>
 
-	<!--
-      DEPENDENCIAS
-      - Agrupadas por responsabilidad.
-      - Regla: starters de Spring no requieren versión (la gestiona el parent).
-    -->
-	<dependencies>
+        <!-- Swagger / OpenAPI -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${openapi.version}</version>
+        </dependency>
 
-		<!-- Web MVC + Tomcat embebido + Jackson -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-		</dependency>
+        <!-- Jackson soporte para LocalDate / LocalDateTime -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
 
-		<!-- Validación Bean Validation (Jakarta) para @Valid, @NotNull, etc. -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-validation</artifactId>
-		</dependency>
+        <!-- JasperReports (sin commons-logging) -->
+        <dependency>
+            <groupId>net.sf.jasperreports</groupId>
+            <artifactId>jasperreports</artifactId>
+            <version>${jasper.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>commons-logging</groupId>
+                    <artifactId>commons-logging</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>net.sf.jasperreports</groupId>
+            <artifactId>jasperreports-fonts</artifactId>
+            <version>${jasper.version}</version>
+        </dependency>
 
-		<!-- Acceso a datos con JDBC (JdbcTemplate); útil para SPs -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-jdbc</artifactId>
-		</dependency>
+        <!-- HTML → PDF -->
+        <dependency>
+            <groupId>com.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-pdfbox</artifactId>
+            <version>${openhtml.version}</version>
+        </dependency>
 
-		<!--
-          JPA/Hibernate (si en otras partes usas repositorios JPA).
-          Si NO usas JPA, puedes eliminar estas 2 dependencias.
-        -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-jpa</artifactId>
-		</dependency>
+        <!-- MapStruct -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+            <version>${mapstruct.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct-processor</artifactId>
+            <version>${mapstruct.version}</version>
+            <scope>provided</scope>
+        </dependency>
 
-		<!--
-          Hibernate Core: TIENES versión fija.
-          *Sugerencia:* puedes quitar la <version> para que la gestione Spring Boot (menor fricción al actualizar).
-        -->
-		<dependency>
-			<groupId>org.hibernate.orm</groupId>
-			<artifactId>hibernate-core</artifactId>
-			<version>6.5.2.Final</version>
-		</dependency>
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.36</version>
+            <scope>provided</scope>
+        </dependency>
 
-		<!--
-          Driver SQL Server:
-          - SIN <scope>runtime</scope> porque COMPILAS contra clases del driver (SQLServerDataTable, etc.)
-          - Version centrada en propiedad mssqljdbc.version
-        -->
-		<dependency>
-			<groupId>com.microsoft.sqlserver</groupId>
-			<artifactId>mssql-jdbc</artifactId>
-			<version>${mssqljdbc.version}</version>
-		</dependency>
+        <!-- Devtools -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
 
-		<!-- OpenAPI UI (Swagger) para documentar y probar REST -->
-		<dependency>
-			<groupId>org.springdoc</groupId>
-			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-			<version>${openapi.version}</version>
-		</dependency>
+        <!-- Tests -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
 
-		<!-- Lombok: genera getters/setters/builders en compilación (requiere annotation processing) -->
-		<dependency>
-			<groupId>org.projectlombok</groupId>
-			<artifactId>lombok</artifactId>
-			<version>1.18.36</version>
-			<scope>provided</scope>
-		</dependency>
+    </dependencies>
 
-		<!-- Jackson JavaTime (LocalDate, OffsetDateTime, etc.) -->
-		<dependency>
-			<groupId>com.fasterxml.jackson.datatype</groupId>
-			<artifactId>jackson-datatype-jsr310</artifactId>
-		</dependency>
-
-		<!-- JasperReports para reportes PDF via JRXML -->
-		<dependency>
-			<groupId>net.sf.jasperreports</groupId>
-			<artifactId>jasperreports</artifactId>
-			<version>${jasper.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>net.sf.jasperreports</groupId>
-			<artifactId>jasperreports-fonts</artifactId>
-			<version>${jasper.version}</version>
-		</dependency>
-
-		<!-- Renderizador HTML→PDF (usa PDFBox internamente) -->
-		<dependency>
-			<groupId>com.openhtmltopdf</groupId>
-			<artifactId>openhtmltopdf-pdfbox</artifactId>
-			<version>${openhtml.version}</version>
-		</dependency>
-
-		<!-- MapStruct (anotaciones) -->
-		<dependency>
-			<groupId>org.mapstruct</groupId>
-			<artifactId>mapstruct</artifactId>
-			<version>${mapstruct.version}</version>
-		</dependency>
-		<!-- MapStruct processor: se ejecuta como annotation processor (no en runtime) -->
-		<dependency>
-			<groupId>org.mapstruct</groupId>
-			<artifactId>mapstruct-processor</artifactId>
-			<version>${mapstruct.version}</version>
-			<scope>provided</scope>
-		</dependency>
-
-		<!-- Devtools para hot reload en desarrollo (no pasar a producción) -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-devtools</artifactId>
-			<scope>runtime</scope>
-			<optional>true</optional>
-		</dependency>
-
-		<!-- Starter de pruebas (JUnit 5, AssertJ, etc.) -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-	</dependencies>
-
-	<!--
-      BUILD / PLUGINS
-      - Configura compilación (Java 17, encoding, annotation processors)
-      - Plugin Spring Boot para empaquetar el jar ejecutable
-    -->
-	<build>
-		<plugins>
-
-			<!--
-              Maven Compiler Plugin
-              - Define versión de Java y encoding
-              - Registra annotation processors (Lombok y MapStruct)
-              - <parameters>true> preserva nombres de parámetros (útil para reflexión/Swagger)
-            -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.11.0</version>
-				<configuration>
-					<source>${java.version}</source>
-					<target>${java.version}</target>
-					<encoding>UTF-8</encoding>
-					<parameters>true</parameters>
-					<annotationProcessorPaths>
-						<path>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-							<version>1.18.36</version>
-						</path>
-						<path>
-							<groupId>org.mapstruct</groupId>
-							<artifactId>mapstruct-processor</artifactId>
-							<version>${mapstruct.version}</version>
-						</path>
-					</annotationProcessorPaths>
-				</configuration>
-			</plugin>
-
-			<!--
-              Spring Boot Maven Plugin
-              - Empaqueta el jar/war ejecutable
-              - Excluye lombok en el repackage (no se necesita en runtime)
-            -->
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-				<configuration>
-					<excludes>
-						<exclude>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-						</exclude>
-					</excludes>
-				</configuration>
-			</plugin>
-
-			<!--
-              (Opcional) Surefire para pruebas unitarias; Boot ya lo configura,
-              pero si quieres personalizar paralelismo o informes, puedes añadirlo.
-              <plugin>
+    <!-- ========================= -->
+    <!--  Configuración del build  -->
+    <!-- ========================= -->
+    <build>
+        <plugins>
+            <!-- Compilador -->
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.2.5</version>
-              </plugin>
-            -->
-		</plugins>
-	</build>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <encoding>UTF-8</encoding>
+                    <parameters>true</parameters>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.36</version>
+                        </path>
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${mapstruct.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+            <!-- Recursos UTF-8 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+
+            <!-- Spring Boot -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

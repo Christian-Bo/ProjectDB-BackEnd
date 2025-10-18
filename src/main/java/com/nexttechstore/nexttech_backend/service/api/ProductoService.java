@@ -1,16 +1,12 @@
 package com.nexttechstore.nexttech_backend.service.api;
 
-import com.nexttechstore.nexttech_backend.model.Producto;
+import com.nexttechstore.nexttech_backend.dto.catalogos.ProductoDto;
 import java.util.List;
 
 public interface ProductoService {
-    List<Producto> listar();
-    // Listar con filtro (texto/marca/categoría) — mapea al SP sp_productos_listar_filtro
-    List<Producto> listar(String texto, Integer marcaId, Integer categoriaId);
-
-    Producto obtener(int id);
-    int crear(Producto p);
-    int actualizar(int id, Producto p);
-    int eliminar(int id);                // lógico
-    int cambiarEstado(int id, int estado);
+    List<ProductoDto> listar();
+    ProductoDto obtener(int id);
+    int crear(ProductoDto dto);
+    int actualizar(int id, ProductoDto dto);
+    int eliminar(int id);
 }

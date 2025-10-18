@@ -1,8 +1,6 @@
 package com.nexttechstore.nexttech_backend.service.impl;
 
 import com.nexttechstore.nexttech_backend.dto.MarcaDto;
-import com.nexttechstore.nexttech_backend.exception.BadRequestException;
-import com.nexttechstore.nexttech_backend.exception.ResourceNotFoundException;
 import com.nexttechstore.nexttech_backend.mapper.MarcaMapper;
 import com.nexttechstore.nexttech_backend.model.entity.MarcaEntity;
 import com.nexttechstore.nexttech_backend.repository.orm.MarcaJpaRepository;
@@ -10,51 +8,69 @@ import com.nexttechstore.nexttech_backend.service.api.MarcaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Service
+@Transactional
 public class MarcaServiceImpl implements MarcaService {
 
     private final MarcaJpaRepository repo;
+    private final MarcaMapper mapper;
 
-    public MarcaServiceImpl(MarcaJpaRepository repo) {
+    public MarcaServiceImpl(MarcaJpaRepository repo, MarcaMapper mapper) {
         this.repo = repo;
+        this.mapper = mapper;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<MarcaDto> listar() {
-        return repo.findAll().stream().map(MarcaMapper::toDto).toList();
+        return repo.findAll().stream().map(mapper::toDto).toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public MarcaDto obtener(int id) {
-        var e = repo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Marca no encontrada: " + id));
-        return MarcaMapper.toDto(e);
+        var e = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Marca no encontrada: " + id));
+        return mapper.toDto(e);
     }
 
-    @Override @Transactional
-    public int crear(MarcaDto d) {
-        if (repo.existsByNombreIgnoreCase(d.getNombre()))
-            throw new BadRequestException("La marca ya existe");
-        MarcaEntity e = new MarcaEntity();
-        MarcaMapper.copyToEntity(d, e);
-        return repo.save(e).getId();
+    @Override
+    public int crear(MarcaDto dto) {
+        if (dto.getNombre() == null || dto.getNombre().isBlank())
+            throw new IllegalArgumentException("El nombre es obligatorio.");
+
+        if (repo.existsByNombreIgnoreCase(dto.getNombre()))
+            throw new IllegalArgumentException("Ya existe una marca con ese nombre.");
+
+        MarcaEntity e = mapper.toEntity(dto);
+        if (e.getFechaCreacion() == null) e.setFechaCreacion(OffsetDateTime.now());
+        if (e.getActivo() == null) e.setActivo(Boolean.TRUE);
+
+        e = repo.save(e);
+        return e.getId();
     }
 
-    @Override @Transactional
-    public int actualizar(int id, MarcaDto d) {
-        var e = repo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Marca no encontrada"));
-        if (!e.getNombre().equalsIgnoreCase(d.getNombre()) && repo.existsByNombreIgnoreCase(d.getNombre()))
-            throw new BadRequestException("La marca ya existe");
-        MarcaMapper.copyToEntity(d, e);
+    @Override
+    public int actualizar(int id, MarcaDto dto) {
+        var e = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Marca no encontrada: " + id));
+
+        if (dto.getNombre() != null && !dto.getNombre().isBlank()
+                && !dto.getNombre().equalsIgnoreCase(e.getNombre())
+                && repo.existsByNombreIgnoreCase(dto.getNombre())) {
+            throw new IllegalArgumentException("Ya existe una marca con ese nombre.");
+        }
+
+        mapper.updateEntityFromDto(dto, e);
         repo.save(e);
         return 1;
     }
 
-    @Override @Transactional
+    @Override
     public int cambiarEstado(int id, int estado) {
-        var e = repo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Marca no encontrada"));
-        e.setEstado(estado);
+        var e = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Marca no encontrada: " + id));
+        e.setActivo(estado == 1);
         repo.save(e);
         return 1;
     }

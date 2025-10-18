@@ -1,37 +1,37 @@
 package com.nexttechstore.nexttech_backend.controller;
 
-import com.nexttechstore.nexttech_backend.dto.catalogos.ProductoDto;
-import com.nexttechstore.nexttech_backend.service.api.ProductoService;
+import com.nexttechstore.nexttech_backend.dto.catalogos.CategoriaDto;
+import com.nexttechstore.nexttech_backend.service.api.CategoriaService;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/productos")
-public class ProductoController {
+@RequestMapping("/api/categorias")
+public class CategoriaController {
 
-    private final ProductoService service;
+    private final CategoriaService service;
 
-    public ProductoController(ProductoService service) {
+    public CategoriaController(CategoriaService service) {
         this.service = service;
     }
 
     @GetMapping
-    public List<ProductoDto> listar() {
+    public List<CategoriaDto> listar() {
         return service.listar();
     }
 
     @GetMapping("/{id}")
-    public ProductoDto obtener(@PathVariable int id) {
+    public CategoriaDto obtener(@PathVariable int id) {
         return service.obtener(id);
     }
 
     @PostMapping
-    public int crear(@RequestBody ProductoDto dto) {
+    public int crear(@RequestBody CategoriaDto dto) {
         return service.crear(dto);
     }
 
     @PutMapping("/{id}")
-    public int actualizar(@PathVariable int id, @RequestBody ProductoDto dto) {
+    public int actualizar(@PathVariable int id, @RequestBody CategoriaDto dto) {
         return service.actualizar(id, dto);
     }
 

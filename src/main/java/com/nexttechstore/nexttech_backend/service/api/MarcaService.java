@@ -6,7 +6,7 @@ import java.util.List;
 public interface MarcaService {
     List<MarcaDto> listar();
     MarcaDto obtener(int id);
-    int crear(MarcaDto d);
-    int actualizar(int id, MarcaDto d);
+    int crear(MarcaDto dto);              // retorna id creado
+    int actualizar(int id, MarcaDto dto); // retorna 1 si ok
     int cambiarEstado(int id, int estado);
 }

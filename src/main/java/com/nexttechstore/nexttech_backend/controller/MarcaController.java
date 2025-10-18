@@ -20,4 +20,3 @@ public class MarcaController {
     @PutMapping("/{id}") public int actualizar(@PathVariable int id, @Valid @RequestBody MarcaDto d){ return service.actualizar(id, d); }
     @PatchMapping("/{id}/estado/{estado}") public int estado(@PathVariable int id, @PathVariable int estado){ return service.cambiarEstado(id, estado); }
 }
-
