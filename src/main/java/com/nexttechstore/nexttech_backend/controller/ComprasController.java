@@ -1,6 +1,7 @@
 package com.nexttechstore.nexttech_backend.controller;
 
 import com.nexttechstore.nexttech_backend.model.compras.*;
+import com.nexttechstore.nexttech_backend.security.AllowedRoles;
 import com.nexttechstore.nexttech_backend.service.api.ComprasService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -8,11 +9,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Endpoints REST para Compras.
  * Convención: la lógica vive en SPs; el controlador valida y pasa el payload.
+ * Catálogos se leen desde sp_COMPRAS_Lookups y catálogos específicos.
  */
+@AllowedRoles({"OPERACIONES"})
 @RestController
 @RequestMapping("/api/compras")
 public class ComprasController {
@@ -81,5 +85,36 @@ public class ComprasController {
     public int anular(@PathVariable int id, @Valid @RequestBody CompraAnularRequest req) {
         req.setCompraId(id);
         return service.anular(req);
+    }
+
+    // =====================  C A T Á L O G O S  ===========================
+    @GetMapping("/catalogos/proveedores")
+    public List<Map<String,Object>> catProveedores(@RequestParam(required = false) Boolean activo) {
+        return service.catalogoProveedores(activo);
+    }
+
+    @GetMapping("/catalogos/bodegas")
+    public List<Map<String,Object>> catBodegas() {
+        return service.catalogoBodegas();
+    }
+
+    @GetMapping("/catalogos/empleados")
+    public List<Map<String,Object>> catEmpleados() {
+        return service.catalogoEmpleados();
+    }
+
+    @GetMapping("/catalogos/productos")
+    public List<Map<String,Object>> catProductos(@RequestParam(required = false) String texto,
+                                                 @RequestParam(required = false) Integer limit) {
+        return service.catalogoProductos(texto, limit);
+    }
+
+    // =====================  A U T O F I L L  =============================
+    // Drop list de productos: al seleccionar uno, el front llama este endpoint
+    // para obtener unidad, precios, marca/categoría y stock por bodega.
+    @GetMapping("/autofill/producto")
+    public Map<String,Object> autoFillProducto(@RequestParam Integer productoId,
+                                               @RequestParam(required = false) Integer bodegaId) {
+        return service.autoFillProducto(productoId, bodegaId);
     }
 }

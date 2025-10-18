@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Implementación que delega al repositorio de SPs.
@@ -22,6 +23,7 @@ public class ComprasServiceSpImpl implements ComprasService {
         this.repo = repo;
     }
 
+    // ===== Compras (SPs) =====
     @Override
     @Transactional(readOnly = true)
     public List<CompraListItem> listar(Date fechaDel, Date fechaAl, Integer proveedorId, String estado, String texto) {
@@ -68,5 +70,37 @@ public class ComprasServiceSpImpl implements ComprasService {
     @Transactional
     public int anular(CompraAnularRequest req) {
         return repo.anular(req);
+    }
+
+    // ===== Catálogos (read-only) =====
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> catalogoProveedores(Boolean soloActivos) {
+        return repo.catalogoProveedores(soloActivos);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> catalogoBodegas() {
+        return repo.catalogoBodegas();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> catalogoEmpleados() {
+        return repo.catalogoEmpleados();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> catalogoProductos(String texto, Integer limit) {
+        return repo.catalogoProductos(texto, limit);
+    }
+
+    // ===== Autofill producto (nuevo) =====
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> autoFillProducto(Integer productoId, Integer bodegaId) {
+        return repo.autoFillProducto(productoId, bodegaId);
     }
 }

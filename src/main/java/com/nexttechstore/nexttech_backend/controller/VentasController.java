@@ -3,6 +3,7 @@ package com.nexttechstore.nexttech_backend.controller;
 import com.nexttechstore.nexttech_backend.dto.VentaDto;
 import com.nexttechstore.nexttech_backend.dto.VentaRequestDto;
 import com.nexttechstore.nexttech_backend.dto.VentaResumenDto;
+import com.nexttechstore.nexttech_backend.security.AllowedRoles;
 import com.nexttechstore.nexttech_backend.service.api.VentasService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -12,6 +13,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
+@AllowedRoles({"OPERACIONES"})
 @RestController
 @RequestMapping("/api/ventas")
 public class VentasController {

@@ -3,8 +3,11 @@ package com.nexttechstore.nexttech_backend.controller;
 import com.nexttechstore.nexttech_backend.dto.catalogos.ProductoDto;
 import com.nexttechstore.nexttech_backend.service.api.ProductoService;
 import org.springframework.web.bind.annotation.*;
+import com.nexttechstore.nexttech_backend.security.AllowedRoles;
+
 import java.util.List;
 
+@AllowedRoles({"OPERACIONES"})
 @RestController
 @RequestMapping("/api/productos")
 public class ProductoController {
