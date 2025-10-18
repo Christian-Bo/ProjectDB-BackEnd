@@ -1,6 +1,7 @@
 package com.nexttechstore.nexttech_backend.controller;
 
 import com.nexttechstore.nexttech_backend.model.cxp.*;
+import com.nexttechstore.nexttech_backend.security.AllowedRoles;
 import com.nexttechstore.nexttech_backend.service.api.CxpService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -10,6 +11,7 @@ import java.util.List;
 /**
  * Endpoints REST para Cuentas por Pagar (CxP).
  */
+@AllowedRoles({"FINANZAS"})
 @RestController
 @RequestMapping("/api/cxp")
 public class CxpController {

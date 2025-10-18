@@ -1,6 +1,7 @@
 package com.nexttechstore.nexttech_backend.controller;
 
 import com.nexttechstore.nexttech_backend.dto.rrhh.*;
+import com.nexttechstore.nexttech_backend.security.AllowedRoles;
 import com.nexttechstore.nexttech_backend.service.api.RrhhService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@AllowedRoles({"RRHH"})
 @RestController
 @RequestMapping("/api/rrhh")
 @RequiredArgsConstructor

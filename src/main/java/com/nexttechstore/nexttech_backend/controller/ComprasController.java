@@ -1,6 +1,7 @@
 package com.nexttechstore.nexttech_backend.controller;
 
 import com.nexttechstore.nexttech_backend.model.compras.*;
+import com.nexttechstore.nexttech_backend.security.AllowedRoles;
 import com.nexttechstore.nexttech_backend.service.api.ComprasService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -17,6 +18,7 @@ import java.util.Map;
  * Además, se agregan endpoints de CATÁLOGOS para combos (proveedores, bodegas,
  * empleados, productos) para no ingresar IDs manualmente en el frontend.
  */
+@AllowedRoles({"OPERACIONES"})
 @RestController
 @RequestMapping("/api/compras")
 public class ComprasController {
