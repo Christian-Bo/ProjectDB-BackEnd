@@ -1,8 +1,6 @@
 package com.nexttechstore.nexttech_backend.controller;
 
-import com.nexttechstore.nexttech_backend.dto.VentaDto;
-import com.nexttechstore.nexttech_backend.dto.VentaRequestDto;
-import com.nexttechstore.nexttech_backend.dto.VentaResumenDto;
+import com.nexttechstore.nexttech_backend.dto.*;
 import com.nexttechstore.nexttech_backend.security.AllowedRoles;
 import com.nexttechstore.nexttech_backend.service.api.VentasService;
 import jakarta.validation.Valid;
