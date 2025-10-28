@@ -9,12 +9,12 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "marcas")
+@Table(name = "listas_precios")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MarcaEntity {
+public class ListaPreciosEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -23,11 +23,11 @@ public class MarcaEntity {
     @Column(nullable = false, unique = true, length = 100)
     private String nombre;
 
-    @Column(columnDefinition = "NVARCHAR(MAX)")
-    private String descripcion;
+    @Column(nullable = false, length = 10)
+    private String moneda = "GTQ";
 
     @Column(nullable = false)
-    private Boolean activo = true;
+    private Boolean activa = true;
 
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private LocalDateTime fechaCreacion;

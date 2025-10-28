@@ -9,18 +9,18 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "marcas")
+@Table(name = "categorias")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MarcaEntity {
+public class CategoriaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(nullable = false, length = 100)
     private String nombre;
 
     @Column(columnDefinition = "NVARCHAR(MAX)")
@@ -28,6 +28,9 @@ public class MarcaEntity {
 
     @Column(nullable = false)
     private Boolean activo = true;
+
+    @Column(name = "categoria_padre_id")
+    private Integer categoriaPadreId;
 
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private LocalDateTime fechaCreacion;
