@@ -23,6 +23,8 @@ public class VentaDto {
     private Integer bodegaOrigenId;
     private OffsetDateTime fechaCreacion;
     private List<VentaDetalleDto> items;
+    private String vendedorNombre;
+    private String cajeroNombre;
 
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
@@ -58,4 +60,8 @@ public class VentaDto {
     public void setFechaCreacion(OffsetDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
     public List<VentaDetalleDto> getItems() { return items; }
     public void setItems(List<VentaDetalleDto> items) { this.items = items; }
+    public String getVendedorNombre() { return vendedorNombre; }
+    public void setVendedorNombre(String vendedorNombre) { this.vendedorNombre = vendedorNombre; }
+    public String getCajeroNombre() { return cajeroNombre; }
+    public void setCajeroNombre(String cajeroNombre) { this.cajeroNombre = cajeroNombre; }
 }

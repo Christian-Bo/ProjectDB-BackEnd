@@ -296,6 +296,9 @@ public class VentasSpRepository {
                     header.put("vendedor_id", rs.getInt("vendedor_id"));
                     header.put("cajero_id", rs.getInt("cajero_id"));
                     header.put("bodega_origen_id", rs.getInt("bodega_origen_id"));
+                    header.put("vendedor_nombre", rs.getString("vendedor_nombre"));
+                    header.put("cajero_nombre",   rs.getString("cajero_nombre"));
+
                 }
             }
 

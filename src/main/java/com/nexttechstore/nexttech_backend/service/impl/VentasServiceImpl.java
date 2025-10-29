@@ -103,7 +103,10 @@ public class VentasServiceImpl implements VentasService {
             dto.setVendedorId((Integer) h.getOrDefault("vendedor_id", null));
             dto.setCajeroId((Integer) h.getOrDefault("cajero_id", null));
             dto.setBodegaOrigenId((Integer) h.getOrDefault("bodega_origen_id", null));
+            dto.setVendedorNombre((String) h.getOrDefault("vendedor_nombre", null));
+            dto.setCajeroNombre((String) h.getOrDefault("cajero_nombre", null));
 
+            // Detalle (AQUÍ agregamos lote y fecha_vencimiento)
             List<VentaDetalleDto> items = new ArrayList<>();
             for (var r : d) {
                 VentaDetalleDto item = new VentaDetalleDto();
@@ -113,6 +116,16 @@ public class VentasServiceImpl implements VentasService {
                 item.setPrecioUnitario((java.math.BigDecimal) r.get("precio_unitario"));
                 item.setDescuentoLinea((java.math.BigDecimal) r.get("descuento_linea"));
                 item.setSubtotal((java.math.BigDecimal) r.get("subtotal"));
+
+                // ← NUEVO:
+                item.setLote((String) r.get("lote"));
+                Object fvDet = r.get("fecha_vencimiento");
+                if (fvDet instanceof java.sql.Date) {
+                    item.setFechaVencimiento(((java.sql.Date) fvDet).toLocalDate());
+                } else if (fvDet instanceof java.sql.Timestamp) {
+                    item.setFechaVencimiento(((java.sql.Timestamp) fvDet).toLocalDateTime().toLocalDate());
+                }
+
                 items.add(item);
             }
             dto.setItems(items);
@@ -123,6 +136,7 @@ public class VentasServiceImpl implements VentasService {
             throw new RuntimeException(ex.getMessage(), ex);
         }
     }
+
 
     @Override
     public List<VentaResumenDto> listarVentas(LocalDate desde, LocalDate hasta,
