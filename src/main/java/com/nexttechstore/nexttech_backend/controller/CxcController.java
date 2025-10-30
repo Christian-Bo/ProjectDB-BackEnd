@@ -1,81 +1,80 @@
 package com.nexttechstore.nexttech_backend.controller;
 
-import com.nexttechstore.nexttech_backend.dto.PagoRequestDto;
-import com.nexttechstore.nexttech_backend.repository.sp.CxcSpRepository;
-import com.nexttechstore.nexttech_backend.service.impl.CxcServiceImpl;
-import com.nexttechstore.nexttech_backend.security.AllowedRoles;
+import com.nexttechstore.nexttech_backend.dto.cxc.CxcAplicacionItemDto;
+import com.nexttechstore.nexttech_backend.repository.orm.CxcQueryRepository;
 import com.nexttechstore.nexttech_backend.service.api.CxcService;
-import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
-import java.sql.Date;
+import java.net.URI;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
-@AllowedRoles({"FINANZAS"})
 @RestController
 @RequestMapping("/api/cxc")
 public class CxcController {
 
-    private final CxcServiceImpl service;
+    private final CxcService service;
+    private final CxcQueryRepository cxcQueryRepo;
 
-    public CxcController(CxcServiceImpl service) {
+    public CxcController(CxcService service, CxcQueryRepository cxcQueryRepo) {
         this.service = service;
+        this.cxcQueryRepo = cxcQueryRepo;
     }
 
-    // [Compat] Tu método original; hoy lanza BadRequest porque no trae clienteId/formapago.
-    @PostMapping("/pagos")
-    public Map<String, Object> aplicarPago(@Valid @RequestBody PagoRequestDto req) {
-        int pagoId = service.aplicarPago(req);
-        return Map.of("pagoId", pagoId, "status", "OK");
-    }
-
-    // ---- NUEVOS ENDPOINTS ----
-
-    /** Crear pago (caja): cliente + monto + forma de pago + (opcional) observaciones */
+    // POST /api/cxc/pagos/crear?clienteId=&monto=&formaPago=&fechaPago=&observaciones=
     @PostMapping("/pagos/crear")
-    public Map<String, Object> crearPago(
+    public ResponseEntity<Map<String,Object>> crearPago(
             @RequestParam Integer clienteId,
-            @RequestParam BigDecimal monto,
-            @RequestParam(defaultValue = "EFECTIVO") String formaPago,
+            @RequestParam java.math.BigDecimal monto,
+            @RequestParam(required = false) String formaPago,
+            @RequestParam(required = false) String fechaPago, // yyyy-MM-dd (el SP no la usa; se ignora)
             @RequestParam(required = false) String observaciones
     ) {
-        int pagoId = service.crearPago(clienteId, monto, formaPago, observaciones);
-        return Map.of("pagoId", pagoId, "status", "OK");
+        LocalDate fecha = (fechaPago != null && !fechaPago.isBlank() ? LocalDate.parse(fechaPago) : null);
+        int pagoId = service.crearPago(clienteId, monto, formaPago, fecha, observaciones);
+        return ResponseEntity.created(URI.create("/api/cxc/pagos/" + pagoId))
+                .body(Map.of("pagoId", pagoId, "status", "OK"));
     }
 
-    /** Aplicar pago a documentos (usa TVP dbo.tvp_cxc_aplicacion) */
+    // POST /api/cxc/pagos/{pagoId}/aplicar   body=[{documentoId,monto}]
     @PostMapping("/pagos/{pagoId}/aplicar")
-    public Map<String, Object> aplicarPagoADocumentos(
-            @PathVariable int pagoId,
-            @RequestBody List<CxcSpRepository.AplicacionItem> items
-    ) {
-        service.aplicarPagoADocs(pagoId, items);
-        return Map.of("pagoId", pagoId, "aplicaciones", items.size(), "status", "OK");
+    public Map<String,Object> aplicarPago(@PathVariable Integer pagoId,
+                                          @RequestBody List<CxcAplicacionItemDto> items) {
+        service.aplicarPago(pagoId, items);
+        return Map.of("pagoId", pagoId, "aplicado", items.size(), "status", "OK");
     }
 
-    /** Anular pago */
+    // POST /api/cxc/pagos/{pagoId}/anular?motivo=
     @PostMapping("/pagos/{pagoId}/anular")
-    public Map<String, Object> anularPago(
-            @PathVariable int pagoId,
-            @RequestParam(required = false) String motivo
-    ) {
+    public Map<String,Object> anularPago(@PathVariable Integer pagoId,
+                                         @RequestParam(required = false) String motivo) {
         service.anularPago(pagoId, motivo);
         return Map.of("pagoId", pagoId, "status", "ANULADO");
     }
 
-    /** Estado de cuenta por cliente (consulta) */
+    // GET /api/cxc/estado-cuenta?clienteId=
     @GetMapping("/estado-cuenta")
-    public List<CxcSpRepository.EstadoCuentaRow> estadoCuenta(
-            @RequestParam Integer clienteId,
+    public List<Map<String,Object>> estadoCuenta(@RequestParam Integer clienteId){
+        return service.estadoCuenta(clienteId);
+    }
+
+    // GET /api/cxc/documentos?clienteId=&estado=&desde=&hasta=
+    @GetMapping("/documentos")
+    public List<Map<String,Object>> listarDocumentos(
+            @RequestParam(required = false) Integer clienteId,
+            @RequestParam(required = false) String estado,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta
-    ) {
-        Date d = (desde != null) ? Date.valueOf(desde) : null;
-        Date h = (hasta != null) ? Date.valueOf(hasta) : null;
-        return service.estadoCuenta(clienteId, d, h);
+    ){
+        java.sql.Date d1 = (desde != null ? java.sql.Date.valueOf(desde) : null);
+        java.sql.Date d2 = (hasta != null ? java.sql.Date.valueOf(hasta) : null);
+        return cxcQueryRepo.listarDocumentos(
+                clienteId,
+                (estado != null && !estado.isBlank() ? estado : null),
+                d1, d2
+        );
     }
 }

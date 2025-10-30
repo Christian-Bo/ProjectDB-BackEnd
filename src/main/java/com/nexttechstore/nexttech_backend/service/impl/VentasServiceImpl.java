@@ -27,10 +27,10 @@ public class VentasServiceImpl implements VentasService {
         try {
             return spRepo.crearVenta(req);
         } catch (BadRequestException ex) {
-            // ❗️Deja pasar 400 (stock insuficiente, concurrencia, etc.)
+            // errores de negocio (p.ej. stock) -> 400
             throw ex;
         } catch (Exception ex) {
-            // Otros errores reales => 500
+            // otros errores -> 500
             throw new RuntimeException(ex.getMessage(), ex);
         }
     }
@@ -74,11 +74,11 @@ public class VentasServiceImpl implements VentasService {
     @Override
     public VentaDto obtenerVentaPorId(int id) {
         try {
-            Map<String,Object> data = spRepo.getVentaById(id);
+            Map<String, Object> data = spRepo.getVentaById(id);
             @SuppressWarnings("unchecked")
-            Map<String,Object> h = (Map<String,Object>) data.get("header");
+            Map<String, Object> h = (Map<String, Object>) data.get("header");
             @SuppressWarnings("unchecked")
-            List<Map<String,Object>> d = (List<Map<String,Object>>) data.get("detalle");
+            List<Map<String, Object>> d = (List<Map<String, Object>>) data.get("detalle");
 
             VentaDto dto = new VentaDto();
             dto.setId((Integer) h.get("id"));
@@ -106,7 +106,7 @@ public class VentasServiceImpl implements VentasService {
             dto.setVendedorNombre((String) h.getOrDefault("vendedor_nombre", null));
             dto.setCajeroNombre((String) h.getOrDefault("cajero_nombre", null));
 
-            // Detalle (AQUÍ agregamos lote y fecha_vencimiento)
+            // Detalle
             List<VentaDetalleDto> items = new ArrayList<>();
             for (var r : d) {
                 VentaDetalleDto item = new VentaDetalleDto();
@@ -116,8 +116,6 @@ public class VentasServiceImpl implements VentasService {
                 item.setPrecioUnitario((java.math.BigDecimal) r.get("precio_unitario"));
                 item.setDescuentoLinea((java.math.BigDecimal) r.get("descuento_linea"));
                 item.setSubtotal((java.math.BigDecimal) r.get("subtotal"));
-
-                // ← NUEVO:
                 item.setLote((String) r.get("lote"));
                 Object fvDet = r.get("fecha_vencimiento");
                 if (fvDet instanceof java.sql.Date) {
@@ -125,7 +123,6 @@ public class VentasServiceImpl implements VentasService {
                 } else if (fvDet instanceof java.sql.Timestamp) {
                     item.setFechaVencimiento(((java.sql.Timestamp) fvDet).toLocalDateTime().toLocalDate());
                 }
-
                 items.add(item);
             }
             dto.setItems(items);
@@ -137,12 +134,14 @@ public class VentasServiceImpl implements VentasService {
         }
     }
 
-
     @Override
-    public List<VentaResumenDto> listarVentas(LocalDate desde, LocalDate hasta,
-                                              Integer clienteId, String numeroVenta,
+    public List<VentaResumenDto> listarVentas(LocalDate desde,
+                                              LocalDate hasta,
+                                              Integer clienteId,
+                                              String numeroVenta,
                                               Boolean incluirAnuladas,
-                                              Integer page, Integer size) {
+                                              Integer page,
+                                              Integer size) {
         try {
             var rows = spRepo.listarVentas(desde, hasta, clienteId, numeroVenta, incluirAnuladas, page, size);
             var list = new ArrayList<VentaResumenDto>();

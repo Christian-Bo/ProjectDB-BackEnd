@@ -1,9 +1,11 @@
 package com.nexttechstore.nexttech_backend.exception;
 
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
+import java.sql.SQLException;
 import java.util.*;
 
 @RestControllerAdvice
@@ -55,5 +57,17 @@ public class GlobalExceptionHandler {
         }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("error", "Error interno", "detail", msg));
+    }
+
+    @ExceptionHandler(SQLException.class)
+    public ResponseEntity<?> handleSql(SQLException ex){
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<?> handleDataAccess(DataAccessException ex){
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", ex.getMostSpecificCause()!=null? ex.getMostSpecificCause().getMessage(): ex.getMessage()));
     }
 }

@@ -5,18 +5,14 @@ import com.microsoft.sqlserver.jdbc.SQLServerDataTable;
 import com.microsoft.sqlserver.jdbc.SQLServerPreparedStatement;
 import com.nexttechstore.nexttech_backend.dto.VentaDetalleEditItemDto;
 import com.nexttechstore.nexttech_backend.dto.VentaHeaderEditDto;
-import com.nexttechstore.nexttech_backend.dto.VentaItemDto;
 import com.nexttechstore.nexttech_backend.dto.VentaRequestDto;
-import com.nexttechstore.nexttech_backend.exception.BadRequestException; // ⬅️ importa tu excepción 400
+import com.nexttechstore.nexttech_backend.exception.BadRequestException;
 import org.springframework.stereotype.Repository;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Repository
 public class VentasSpRepository {
@@ -27,7 +23,7 @@ public class VentasSpRepository {
         this.dataSource = dataSource;
     }
 
-    // ========= Helpers: lectura tolerante de columnas =========
+    // ========= Helpers =========
     private Integer readIntAny(ResultSet rs, String... labels) throws SQLException {
         for (String l : labels) {
             try {
@@ -35,7 +31,7 @@ public class VentasSpRepository {
                 if (o == null) continue;
                 if (o instanceof Number n) return n.intValue();
                 if (o instanceof String s && !s.isBlank()) return Integer.parseInt(s.trim());
-            } catch (SQLException ignore) { /* probar siguiente label */ }
+            } catch (SQLException ignore) {}
         }
         throw new SQLException("No se encontró ninguna columna int: " + String.join(", ", labels));
     }
@@ -45,7 +41,7 @@ public class VentasSpRepository {
             try {
                 String s = rs.getString(l);
                 if (s != null) return s;
-            } catch (SQLException ignore) { /* probar siguiente label */ }
+            } catch (SQLException ignore) {}
         }
         return null;
     }
@@ -67,7 +63,7 @@ public class VentasSpRepository {
         String msg = null;
     }
 
-    /** Crea venta vía SP: dbo.sp_ventas_create (usa TVP v2 con lote/vence) */
+    /** Crea venta vía SP y, si es crédito, genera el documento CxC llamando a sp_cxc_documento_from_venta. */
     public int crearVenta(VentaRequestDto req) throws SQLException {
         if (req.getItems() == null || req.getItems().isEmpty()) {
             throw new SQLException("La venta debe tener al menos 1 ítem");
@@ -117,6 +113,7 @@ public class VentasSpRepository {
                         "  @out_venta_id=@out_venta_id OUTPUT, @out_status_code=@out_status_code OUTPUT, @out_message=@out_message OUTPUT; \n" +
                         "SELECT @out_venta_id AS out_venta_id, @out_status_code AS code, @out_message AS msg;";
 
+        int ventaId;
         try (Connection conn = dataSource.getConnection()) {
             SQLServerConnection sqlConn = conn.unwrap(SQLServerConnection.class);
             try (SQLServerPreparedStatement ps = (SQLServerPreparedStatement) sqlConn.prepareStatement(sql)) {
@@ -147,15 +144,34 @@ public class VentasSpRepository {
                     }
                 }
 
-                // 🔴 MAPEOS A 400: códigos de negocio desde el SP
                 if (out.code == 1403) throw new BadRequestException(out.msg != null ? out.msg : "Stock insuficiente");
                 if (out.code == 1404) throw new BadRequestException(out.msg != null ? out.msg : "Conflicto de concurrencia");
-
                 if (out.code != 0) throw new SQLException("sp_ventas_create (" + out.code + "): " + out.msg);
                 if (out.id <= 0)   throw new SQLException("sp_ventas_create no devolvió id válido");
-                return out.id;
+                ventaId = out.id;
             }
         }
+
+        // ===== Si es CRÉDITO, crear el documento de CxC =====
+        if (esCredito) {
+            // Reutilizamos el SP existente para obtener header y luego llamamos a sp_cxc_documento_from_venta
+            Map<String, Object> venta = getVentaById(ventaId); // RS1 header
+            @SuppressWarnings("unchecked")
+            Map<String,Object> h = (Map<String, Object>) venta.get("header");
+
+            Integer clienteId = (Integer) h.get("cliente_id");
+            String  numero    = (String)  h.get("numero_venta");
+            java.sql.Date fechaEmision;
+            Object fv = h.get("fecha_venta");
+            if (fv instanceof java.sql.Date d)      fechaEmision = d;
+            else if (fv instanceof java.sql.Timestamp ts) fechaEmision = new java.sql.Date(ts.getTime());
+            else fechaEmision = new java.sql.Date(System.currentTimeMillis());
+            BigDecimal total = (BigDecimal) h.get("total");
+
+            crearDocumentoCxCDesdeVenta(clienteId, ventaId, numero, fechaEmision, null, total);
+        }
+
+        return ventaId;
     }
 
     /** Anula venta: sp_ventas_anular */
@@ -298,7 +314,6 @@ public class VentasSpRepository {
                     header.put("bodega_origen_id", rs.getInt("bodega_origen_id"));
                     header.put("vendedor_nombre", rs.getString("vendedor_nombre"));
                     header.put("cajero_nombre",   rs.getString("cajero_nombre"));
-
                 }
             }
 
@@ -330,7 +345,7 @@ public class VentasSpRepository {
         }
     }
 
-    /** Listar */
+    /** Listar ventas (resumen) */
     public List<Map<String,Object>> listarVentas(
             java.time.LocalDate desde,
             java.time.LocalDate hasta,
@@ -349,8 +364,8 @@ public class VentasSpRepository {
 
             if (desde != null) ps.setDate(1, java.sql.Date.valueOf(desde)); else ps.setNull(1, Types.DATE);
             if (hasta != null) ps.setDate(2, java.sql.Date.valueOf(hasta)); else ps.setNull(2, Types.DATE);
-            if (clienteId != null) ps.setInt(3, clienteId); else ps.setNull(3, Types.INTEGER);
             if (numeroVenta != null && !numeroVenta.isBlank()) ps.setString(4, numeroVenta); else ps.setNull(4, Types.NVARCHAR);
+            if (clienteId != null) ps.setInt(3, clienteId); else ps.setNull(3, Types.INTEGER);
             ps.setBoolean(5, incluirAnuladas != null ? incluirAnuladas : false);
             ps.setInt(6, page != null ? page : 0);
             ps.setInt(7, size != null ? size : 50);
@@ -371,6 +386,44 @@ public class VentasSpRepository {
                 }
             }
             return list;
+        }
+    }
+
+    // ====== NUEVO: ejecuta sp_cxc_documento_from_venta ======
+    public int crearDocumentoCxCDesdeVenta(
+            int clienteId,
+            int ventaId,
+            String numeroVenta,
+            java.sql.Date fechaEmision,
+            java.sql.Date fechaVencimiento, // puede ser null => SP pondrá +30 días
+            BigDecimal total
+    ) throws SQLException {
+        String sql =
+                "DECLARE @doc_id INT, @code INT, @msg NVARCHAR(200); " +
+                        "EXEC dbo.sp_cxc_documento_from_venta " +
+                        "  @p_cliente_id=?, @p_venta_id=?, @p_numero_venta=?, @p_fecha_emision=?, @p_fecha_vencimiento=?, " +
+                        "  @p_moneda=?, @p_monto_total=?, " +
+                        "  @out_documento_id=@doc_id OUTPUT, @out_status_code=@code OUTPUT, @out_message=@msg OUTPUT; " +
+                        "SELECT @doc_id AS doc_id, @code AS code, @msg AS msg;";
+
+        try (Connection c = dataSource.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, clienteId);
+            ps.setInt(2, ventaId);
+            ps.setString(3, numeroVenta);
+            ps.setDate(4, fechaEmision);
+            if (fechaVencimiento == null) ps.setNull(5, Types.DATE); else ps.setDate(5, fechaVencimiento);
+            ps.setString(6, "GTQ");
+            ps.setBigDecimal(7, total);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) throw new SQLException("sp_cxc_documento_from_venta sin resultado");
+                int code = rs.getInt("code");
+                String msg = rs.getString("msg");
+                int docId = rs.getInt("doc_id");
+                if (code != 0) throw new SQLException("sp_cxc_documento_from_venta (" + code + "): " + msg);
+                return docId; // si ya existía y devolvió EXISTENTE, code=0 y docId es el existente
+            }
         }
     }
 }

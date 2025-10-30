@@ -11,7 +11,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
-@AllowedRoles({"OPERACIONES"})
+
 @RestController
 @RequestMapping("/api/ventas")
 public class VentasController {
