@@ -2,6 +2,7 @@ package com.nexttechstore.nexttech_backend.controller;
 
 import com.nexttechstore.nexttech_backend.dto.cxc.CxcAplicacionItemDto;
 import com.nexttechstore.nexttech_backend.repository.orm.CxcQueryRepository;
+import com.nexttechstore.nexttech_backend.service.api.CxcPagosService;
 import com.nexttechstore.nexttech_backend.service.api.CxcService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -18,10 +19,13 @@ public class CxcController {
 
     private final CxcService service;
     private final CxcQueryRepository cxcQueryRepo;
+    private final CxcPagosService cxcPagosService;                // <-- NUEVO
 
-    public CxcController(CxcService service, CxcQueryRepository cxcQueryRepo) {
+
+    public CxcController(CxcService service, CxcQueryRepository cxcQueryRepo, CxcPagosService cxcPagosService) {
         this.service = service;
         this.cxcQueryRepo = cxcQueryRepo;
+        this.cxcPagosService = cxcPagosService;
     }
 
     // POST /api/cxc/pagos/crear?clienteId=&monto=&formaPago=&fechaPago=&observaciones=
@@ -77,4 +81,31 @@ public class CxcController {
                 d1, d2
         );
     }
+    @GetMapping("/documentos/{documentoId}")
+    public Map<String,Object> getDocumento(@PathVariable Integer documentoId){
+        return cxcQueryRepo.getDocumentoById(documentoId);
+    }
+
+    @GetMapping("/documentos/{documentoId}/aplicaciones")
+    public List<Map<String,Object>> historialAplicaciones(@PathVariable Integer documentoId){
+        return cxcQueryRepo.listarAplicacionesPorDocumento(documentoId);
+    }
+
+    // ------------------- pagos (consultas por SPs) -------------------
+    @GetMapping("/pagos")
+    public List<Map<String,Object>> listarPagos(
+            @RequestParam(required = false) Integer clienteId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta
+    ){
+        java.sql.Date d1 = (desde != null ? java.sql.Date.valueOf(desde) : null);
+        java.sql.Date d2 = (hasta != null ? java.sql.Date.valueOf(hasta) : null);
+        return cxcPagosService.listarPagos(clienteId, d1, d2);   // <-- ahora usa SP
+    }
+
+    @GetMapping("/pagos/{pagoId}/aplicaciones")
+    public List<Map<String,Object>> listarAplicacionesPorPago(@PathVariable Integer pagoId){
+        return cxcPagosService.listarAplicacionesPorPago(pagoId);
+    }
+
 }
