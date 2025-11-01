@@ -10,6 +10,7 @@ public interface VentasService {
     void anular(int ventaId, String motivo);
     void editarHeader(int ventaId, VentaHeaderEditDto dto);
     void editarDetalle(int ventaId, java.util.List<VentaDetalleEditItemDto> items);
+    SaldosDto obtenerSaldos(int ventaId);
 
     VentaDto obtenerVentaPorId(int id);
 

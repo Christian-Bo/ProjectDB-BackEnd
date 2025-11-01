@@ -3,6 +3,7 @@ package com.nexttechstore.nexttech_backend.repository.sp;
 import com.microsoft.sqlserver.jdbc.SQLServerConnection;
 import com.microsoft.sqlserver.jdbc.SQLServerDataTable;
 import com.microsoft.sqlserver.jdbc.SQLServerPreparedStatement;
+import com.nexttechstore.nexttech_backend.dto.SaldosDto;
 import com.nexttechstore.nexttech_backend.dto.VentaDetalleEditItemDto;
 import com.nexttechstore.nexttech_backend.dto.VentaHeaderEditDto;
 import com.nexttechstore.nexttech_backend.dto.VentaRequestDto;
@@ -190,10 +191,19 @@ public class VentasSpRepository {
                 if (!rs.next()) throw new SQLException("Sin resultado de sp_ventas_anular");
                 int code = rs.getInt("code");
                 String msg = rs.getString("msg");
+
+                // 🔒 negocio: venta con pagos aplicados
+                if (code == 2201) {
+                    throw new com.nexttechstore.nexttech_backend.exception.BadRequestException(
+                            (msg != null && !msg.isBlank()) ? msg
+                                    : "No se puede anular: el documento tiene pagos aplicados.");
+                }
+
                 if (code != 0) throw new SQLException("sp_ventas_anular (" + code + "): " + msg);
             }
         }
     }
+
 
     /** Edita cabecera */
     public void editarHeader(int ventaId, VentaHeaderEditDto dto) throws SQLException {
@@ -423,6 +433,53 @@ public class VentasSpRepository {
                 int docId = rs.getInt("doc_id");
                 if (code != 0) throw new SQLException("sp_cxc_documento_from_venta (" + code + "): " + msg);
                 return docId; // si ya existía y devolvió EXISTENTE, code=0 y docId es el existente
+            }
+        }
+    }
+    public SaldosDto obtenerSaldos(int ventaId) throws SQLException {
+        final String sql = "EXEC dbo.sp_ventas_get_saldos @p_venta_id=?";
+
+        try (Connection c = dataSource.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            ps.setInt(1, ventaId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) throw new SQLException("sp_ventas_get_saldos sin resultado");
+
+                Integer code = null; String msg = null;
+                try { code = rs.getInt("code"); if (rs.wasNull()) code = 0; } catch (SQLException ignore) {}
+                try { msg  = rs.getString("message"); } catch (SQLException ignore) {}
+                if (msg == null || msg.isBlank()) { try { msg = rs.getString("msg"); } catch (SQLException ignore) {} }
+                if (code != null && code != 0) throw new SQLException("sp_ventas_get_saldos ("+code+"): " + (msg!=null?msg:"error"));
+
+                SaldosDto dto = new SaldosDto();
+                try { dto.setOrigen(rs.getString("origen")); } catch (SQLException ignore) {}
+                try { dto.setTotal(rs.getBigDecimal("total")); } catch (SQLException ignore) {}
+                try { dto.setPagado(rs.getBigDecimal("pagado")); } catch (SQLException ignore) {}
+                try { dto.setSaldo(rs.getBigDecimal("saldo")); } catch (SQLException ignore) {}
+                try { Object o = rs.getObject("documento_id"); if (o instanceof Number n) dto.setDocumentoId(n.intValue()); } catch (SQLException ignore) {}
+                try { Object o = rs.getObject("cliente_id");   if (o instanceof Number n) dto.setClienteId(n.intValue());   } catch (SQLException ignore) {}
+
+                // Si la 1a fila solo traía status y viene otra con datos
+                if ((dto.getOrigen() == null || dto.getOrigen().isBlank()) && ps.getMoreResults()) {
+                    try (ResultSet rs2 = ps.getResultSet()) {
+                        if (rs2 != null && rs2.next()) {
+                            try { dto.setOrigen(rs2.getString("origen")); } catch (SQLException ignore) {}
+                            try { dto.setTotal(rs2.getBigDecimal("total")); } catch (SQLException ignore) {}
+                            try { dto.setPagado(rs2.getBigDecimal("pagado")); } catch (SQLException ignore) {}
+                            try { dto.setSaldo(rs2.getBigDecimal("saldo")); } catch (SQLException ignore) {}
+                            try { Object o = rs2.getObject("documento_id"); if (o instanceof Number n) dto.setDocumentoId(n.intValue()); } catch (SQLException ignore) {}
+                            try { Object o = rs2.getObject("cliente_id");   if (o instanceof Number n) dto.setClienteId(n.intValue());   } catch (SQLException ignore) {}
+                        }
+                    }
+                }
+
+                if (dto.getOrigen() == null) dto.setOrigen("CONTADO");
+                if (dto.getTotal()  == null) dto.setTotal(java.math.BigDecimal.ZERO);
+                if (dto.getPagado() == null) dto.setPagado(java.math.BigDecimal.ZERO);
+                if (dto.getSaldo()  == null) dto.setSaldo(dto.getTotal().subtract(dto.getPagado()));
+                return dto;
             }
         }
     }

@@ -171,4 +171,23 @@ public class VentasServiceImpl implements VentasService {
             throw new RuntimeException(ex.getMessage(), ex);
         }
     }
+
+    @Override
+    public SaldosDto obtenerSaldos(int ventaId) {
+        try {
+            SaldosDto s = spRepo.obtenerSaldos(ventaId);
+            if (s == null) {
+                SaldosDto d = new SaldosDto();
+                d.setOrigen("CONTADO");
+                d.setTotal(java.math.BigDecimal.ZERO);
+                d.setPagado(java.math.BigDecimal.ZERO);
+                d.setSaldo(java.math.BigDecimal.ZERO);
+                return d;
+            }
+            return s;
+        } catch (Exception ex) {
+            throw new RuntimeException("obtenerSaldos: " + ex.getMessage(), ex);
+        }
+    }
+
 }

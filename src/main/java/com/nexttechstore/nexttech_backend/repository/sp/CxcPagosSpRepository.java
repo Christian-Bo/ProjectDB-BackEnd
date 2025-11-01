@@ -51,7 +51,7 @@ public class CxcPagosSpRepository {
         }
     }
 
-    /** Detalle de aplicaciones por pago */
+    /** Detalle de aplicaciones por pago (SP ya oculta documentos anulados) */
     public List<Map<String, Object>> listarAplicacionesPorPago(Integer pagoId) throws SQLException {
         final String sql = "EXEC dbo.sp_cxc_pagos_aplicaciones @p_pago_id=?";
         try (Connection conn = dataSource.getConnection();
@@ -63,21 +63,38 @@ public class CxcPagosSpRepository {
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     Map<String,Object> r = new HashMap<>();
-                    r.put("aplicacionId",     rs.getInt("aplicacion_id"));
-                    r.put("pagoId",           rs.getInt("pago_id"));
-                    r.put("documentoId",      getMaybeNullInt(rs, "documento_id"));
-                    r.put("numeroDocumento",  rs.getString("numero_documento"));
-                    r.put("origenTipo",       rs.getString("origen_tipo"));
-                    r.put("origenId",         getMaybeNullInt(rs, "origen_id"));
-                    r.put("montoAplicado",    rs.getBigDecimal("monto_aplicado"));
-                    r.put("fechaAplicacion",  asLocalDate(rs.getDate("fecha_aplicacion")));
-                    r.put("formaPago",        rs.getString("forma_pago"));
-                    r.put("observaciones",    rs.getString("observaciones"));
+                    // obligatorios del SP
+                    r.put("aplicacionId",    safeInt(rs, "aplicacion_id"));
+                    r.put("pagoId",          safeInt(rs, "pago_id"));
+                    r.put("documentoId",     safeIntNullable(rs, "documento_id"));
+                    r.put("numeroDocumento", safeStr(rs, "numero_documento"));
+                    r.put("montoAplicado",   rs.getBigDecimal("monto_aplicado"));
+                    r.put("fechaAplicacion", asLocalDate(rs.getDate("fecha_aplicacion")));
+
+                    // opcionales (si el SP los expone se leerán, si no quedarán en null)
+                    r.put("origenTipo",      safeStr(rs, "origen_tipo"));
+                    r.put("origenId",        safeIntNullable(rs, "origen_id"));
+                    r.put("formaPago",       safeStr(rs, "forma_pago"));
+                    r.put("observaciones",   safeStr(rs, "observaciones"));
+
                     list.add(r);
                 }
             }
             return list;
         }
+    }
+
+    private static Integer safeIntNullable(ResultSet rs, String col) throws SQLException {
+        try {
+            int v = rs.getInt(col);
+            return rs.wasNull() ? null : v;
+        } catch (SQLException ignore) { return null; }
+    }
+    private static Integer safeInt(ResultSet rs, String col) throws SQLException {
+        try { return rs.getInt(col); } catch (SQLException e) { return null; }
+    }
+    private static String safeStr(ResultSet rs, String col) throws SQLException {
+        try { return rs.getString(col); } catch (SQLException e) { return null; }
     }
 
     // ===== helpers =====
