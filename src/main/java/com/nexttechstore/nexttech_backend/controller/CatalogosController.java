@@ -5,6 +5,7 @@ import com.nexttechstore.nexttech_backend.dto.catalogos.ClienteDto;
 import com.nexttechstore.nexttech_backend.dto.catalogos.ProductoStockDto;
 import com.nexttechstore.nexttech_backend.dto.catalogos.EmpleadoDto;
 import com.nexttechstore.nexttech_backend.repository.orm.CatalogosQueryRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -44,5 +45,15 @@ public class CatalogosController {
     @GetMapping("/empleados")
     public List<EmpleadoDto> empleados() {
         return repo.empleados();
+    }
+
+    @GetMapping("/series-facturas")
+    public java.util.List<java.util.Map<String,Object>> seriesFacturas(JdbcTemplate jdbc) {
+        return jdbc.queryForList("""
+        SELECT id, serie, tipo_documento, correlativo_actual, correlativo_maximo, estado
+        FROM series_facturas
+        WHERE estado='A'
+        ORDER BY serie
+    """);
     }
 }
