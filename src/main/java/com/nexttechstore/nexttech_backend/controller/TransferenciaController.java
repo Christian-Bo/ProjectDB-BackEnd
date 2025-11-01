@@ -7,46 +7,97 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/transferencias")
 @CrossOrigin(origins = "*")
 public class TransferenciaController {
 
+    private static final Logger log = LoggerFactory.getLogger(TransferenciaController.class);
+
     @Autowired
     private TransferenciaService transferenciaService;
 
-    @GetMapping
+    /**
+     * Listar transferencias.
+     * - Si vienen filtros, se delega directo al service.
+     * - Si NO vienen filtros (todos null/empty), se hace un Fallback:
+     *   se consulta por cada estado (P,E,R,C), se fusionan resultados y se devuelven todos.
+     * - Nunca se devuelve 500 por error del SP en el listado general; en su lugar, 200 con lista vacía.
+     */
+    @GetMapping(produces = "application/json")
     public ResponseEntity<List<TransferenciaDto>> listarTransferencias(
             @RequestParam(required = false) Integer bodegaOrigenId,
             @RequestParam(required = false) Integer bodegaDestinoId,
-            @RequestParam(required = false) String estado) {
+            @RequestParam(required = false) String estado
+    ) {
+        // Normalizamos estado
+        String estadoNorm = (estado == null || estado.trim().isEmpty())
+                ? null
+                : estado.trim().toUpperCase(Locale.ROOT);
+
+        final boolean sinFiltros = bodegaOrigenId == null && bodegaDestinoId == null && estadoNorm == null;
+
         try {
-            List<TransferenciaDto> transferencias = transferenciaService.listarTransferencias(
-                    bodegaOrigenId, bodegaDestinoId, estado);
-            return ResponseEntity.ok(transferencias);
+            if (!sinFiltros) {
+                // Con filtros: llamada directa
+                List<TransferenciaDto> list = transferenciaService
+                        .listarTransferencias(bodegaOrigenId, bodegaDestinoId, estadoNorm);
+                return ResponseEntity.ok(list != null ? list : Collections.emptyList());
+            }
+
+            // ====== Fallback SIN filtros ======
+            // Muchos SP revientan con parámetros NULL; aquí consultamos por estado y unimos resultados.
+            String[] estados = {"P", "E", "R", "C"};
+            Map<Integer, TransferenciaDto> dedup = new LinkedHashMap<>();
+
+            for (String est : estados) {
+                try {
+                    List<TransferenciaDto> parciales =
+                            transferenciaService.listarTransferencias(null, null, est);
+
+                    if (parciales != null) {
+                        for (TransferenciaDto dto : parciales) {
+                            if (dto != null && dto.getId() != null) {
+                                dedup.put(dto.getId(), dto); // evita duplicados por id
+                            }
+                        }
+                    }
+                } catch (Exception exEstado) {
+                    // No rompemos el flujo; seguimos con otros estados
+                    log.warn("Fallo al listar por estado {}: {}", est, exEstado.getMessage());
+                }
+            }
+
+            List<TransferenciaDto> resultado = new ArrayList<>(dedup.values());
+            return ResponseEntity.ok(resultado);
+
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            log.error("Error en listarTransferencias: {}", e.getMessage(), e);
+            // Para no romper el front: devolvemos lista vacía
+            return ResponseEntity.ok(Collections.emptyList());
         }
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(value = "/{id}", produces = "application/json")
     public ResponseEntity<TransferenciaDto> obtenerTransferenciaPorId(@PathVariable Integer id) {
         try {
             TransferenciaDto transferencia = transferenciaService.obtenerTransferenciaPorId(id);
             if (transferencia != null) {
                 return ResponseEntity.ok(transferencia);
             }
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         } catch (Exception e) {
+            log.error("Error al obtener transferencia {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
-    @PostMapping
+    @PostMapping(consumes = "application/json", produces = "application/json")
     public ResponseEntity<Map<String, Object>> crearTransferencia(@RequestBody TransferenciaDto transferenciaDto) {
         try {
             TransferenciaDto nuevaTransferencia = transferenciaService.crearTransferencia(transferenciaDto);
@@ -70,7 +121,7 @@ public class TransferenciaController {
         }
     }
 
-    @PutMapping("/{id}/aprobar")
+    @PutMapping(value = "/{id}/aprobar", produces = "application/json")
     public ResponseEntity<Map<String, Object>> aprobarTransferencia(
             @PathVariable Integer id,
             @RequestParam Integer aprobadorId) {
@@ -88,7 +139,7 @@ public class TransferenciaController {
         }
     }
 
-    @PutMapping("/{id}/recibir")
+    @PutMapping(value = "/{id}/recibir", produces = "application/json")
     public ResponseEntity<Map<String, Object>> recibirTransferencia(
             @PathVariable Integer id,
             @RequestParam Integer receptorId) {
@@ -106,7 +157,7 @@ public class TransferenciaController {
         }
     }
 
-    @PutMapping("/{id}/cancelar")
+    @PutMapping(value = "/{id}/cancelar", produces = "application/json")
     public ResponseEntity<Map<String, Object>> cancelarTransferencia(@PathVariable Integer id) {
         try {
             transferenciaService.cancelarTransferencia(id);
