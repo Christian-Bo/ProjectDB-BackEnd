@@ -13,11 +13,11 @@ import java.util.List;
 
 /**
  * SPs reales:
- *  - sp_CXP_Pagos_Crear(@UsuarioId,@ProveedorId,@FechaPago,@FormaPago,@MontoTotal,@Observaciones?,@PagoIdOut OUTPUT) -> SELECT pago + SELECT aplicaciones
+ *  - sp_CXP_Pagos_Crear(@UsuarioId,@ProveedorId,@FechaPago,@FormaPago,@MontoTotal,@Observaciones?,@PagoIdOut OUTPUT) -> SELECT fila creada
  *  - sp_CXP_Pagos_Listar(@ProveedorId?,@Texto?) -> SELECT ...
- *  - sp_CXP_Pagos_Editar(@UsuarioId,@Id,@FechaPago,@FormaPago,@MontoTotal,@Observaciones?) -> SELECT pago editado
- *  - sp_CXP_Pagos_Eliminar(@UsuarioId,@Id) -> SELECT eliminado,id
- *  - sp_CXP_Pagos_Anular(@UsuarioId,@Id) -> SELECT anulado,id
+ *  - sp_CXP_Pagos_Editar(@UsuarioId,@Id,@FechaPago,@FormaPago,@MontoTotal,@Observaciones?) -> SELECT fila editada
+ *  - sp_CXP_Pagos_Eliminar(@UsuarioId,@Id) -> SELECT id
+ *  - sp_CXP_Pagos_Anular(@UsuarioId,@Id) -> SELECT id
  */
 @Repository
 public class CxpPagosSpRepository {
@@ -29,17 +29,42 @@ public class CxpPagosSpRepository {
     }
 
     private static final RowMapper<CxpPago> ROW = new RowMapper<>() {
-        @Override public CxpPago mapRow(ResultSet rs, int rowNum) throws SQLException {
+        @Override
+        public CxpPago mapRow(ResultSet rs, int rowNum) throws SQLException {
             CxpPago p = new CxpPago();
             p.setId(rs.getInt("id"));
             p.setProveedor_id(rs.getInt("proveedor_id"));
-            p.setFecha_pago(rs.getDate("fecha_pago").toLocalDate());
+
+            // NUEVO: Leer nombre del proveedor (viene del SP con JOIN)
+            p.setProveedor_nombre(safeGetString(rs, "proveedor_nombre"));
+
+            java.sql.Date fp = rs.getDate("fecha_pago");
+            if (fp != null) {
+                p.setFecha_pago(fp.toLocalDate());
+            }
+
             p.setForma_pago(rs.getString("forma_pago"));
             p.setMonto_total(rs.getBigDecimal("monto_total"));
             p.setObservaciones(rs.getString("observaciones"));
+
+            // audit
+            java.sql.Timestamp ts = rs.getTimestamp("fecha_creacion");
+            if (ts != null) {
+                p.setFecha_creacion(ts.toInstant().atOffset(java.time.ZoneOffset.UTC));
+            }
+
             return p;
         }
     };
+
+    // Método helper para leer columnas opcionales sin error
+    private static String safeGetString(ResultSet rs, String columnName) {
+        try {
+            return rs.getString(columnName);
+        } catch (SQLException e) {
+            return null;
+        }
+    }
 
     public List<CxpPago> listar(Integer proveedorId, String texto) {
         String sql = "EXEC dbo.sp_CXP_Pagos_Listar @ProveedorId=?, @Texto=?";
@@ -47,18 +72,20 @@ public class CxpPagosSpRepository {
     }
 
     public CxpPago crear(Integer usuarioId, CxpPagoRequest r) {
-        // El SP retorna el pago (y además un SELECT de aplicaciones). queryForObject toma el primer result set.
         String sql = "EXEC dbo.sp_CXP_Pagos_Crear "
-                + "@UsuarioId=?, @ProveedorId=?, @FechaPago=?, @FormaPago=?, @MontoTotal=?, @Observaciones=?, @PagoIdOut=NULL";
+                + "@UsuarioId=?, @ProveedorId=?, @FechaPago=?, @FormaPago=?, "
+                + "@MontoTotal=?, @Observaciones=?, @PagoIdOut=NULL";
         return jdbc.queryForObject(sql, ROW,
-                usuarioId, r.getProveedor_id(), r.getFecha_pago(), r.getForma_pago(), r.getMonto_total(), r.getObservaciones());
+                usuarioId, r.getProveedor_id(), r.getFecha_pago(), r.getForma_pago(),
+                r.getMonto_total(), r.getObservaciones());
     }
 
     public CxpPago editar(Integer usuarioId, Integer id, CxpPagoEditarRequest r) {
         String sql = "EXEC dbo.sp_CXP_Pagos_Editar "
                 + "@UsuarioId=?, @Id=?, @FechaPago=?, @FormaPago=?, @MontoTotal=?, @Observaciones=?";
         return jdbc.queryForObject(sql, ROW,
-                usuarioId, id, r.getFecha_pago(), r.getForma_pago(), r.getMonto_total(), r.getObservaciones());
+                usuarioId, id, r.getFecha_pago(), r.getForma_pago(),
+                r.getMonto_total(), r.getObservaciones());
     }
 
     public Integer eliminar(Integer usuarioId, Integer id) {

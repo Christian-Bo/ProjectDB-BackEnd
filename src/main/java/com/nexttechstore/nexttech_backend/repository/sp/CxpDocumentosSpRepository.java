@@ -28,17 +28,29 @@ public class CxpDocumentosSpRepository {
     }
 
     private static final RowMapper<CxpDocumento> ROW = new RowMapper<>() {
-        @Override public CxpDocumento mapRow(ResultSet rs, int rowNum) throws SQLException {
+        @Override
+        public CxpDocumento mapRow(ResultSet rs, int rowNum) throws SQLException {
             CxpDocumento d = new CxpDocumento();
             d.setId(rs.getInt("id"));
             d.setProveedor_id(rs.getInt("proveedor_id"));
+
+            // NUEVO: Leer nombre del proveedor
+            d.setProveedor_nombre(safeGetString(rs, "proveedor_nombre"));
+
             d.setOrigen_tipo(rs.getString("origen_tipo"));
             d.setOrigen_id(rs.getInt("origen_id"));
+
+            // NUEVO: Leer nombre del origen
+            d.setOrigen_nombre(safeGetString(rs, "origen_nombre"));
+
             d.setNumero_documento(rs.getString("numero_documento"));
             d.setFecha_emision(rs.getDate("fecha_emision").toLocalDate());
-            if (rs.getDate("fecha_vencimiento") != null) {
-                d.setFecha_vencimiento(rs.getDate("fecha_vencimiento").toLocalDate());
+
+            java.sql.Date fechaVenc = rs.getDate("fecha_vencimiento");
+            if (fechaVenc != null) {
+                d.setFecha_vencimiento(fechaVenc.toLocalDate());
             }
+
             d.setMoneda(rs.getString("moneda"));
             d.setMonto_total(rs.getBigDecimal("monto_total"));
             d.setSaldo_pendiente(rs.getBigDecimal("saldo_pendiente"));
@@ -46,6 +58,15 @@ public class CxpDocumentosSpRepository {
             return d;
         }
     };
+
+    // Método helper para leer columnas opcionales sin error
+    private static String safeGetString(ResultSet rs, String columnName) {
+        try {
+            return rs.getString(columnName);
+        } catch (SQLException e) {
+            return null;
+        }
+    }
 
     public List<CxpDocumento> listar(Integer proveedorId, String texto) {
         String sql = "EXEC dbo.sp_CXP_Documentos_Listar @ProveedorId=?, @Texto=?";

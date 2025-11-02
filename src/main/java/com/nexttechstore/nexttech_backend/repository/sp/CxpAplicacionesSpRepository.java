@@ -34,13 +34,53 @@ public class CxpAplicacionesSpRepository {
             CxpAplicacion a = new CxpAplicacion();
             a.setId(rs.getInt("id"));
             a.setPago_id(rs.getInt("pago_id"));
+
+            // NUEVO: Información del pago
+            a.setPago_fecha(safeGetDate(rs, "pago_fecha"));
+            a.setPago_forma_pago(safeGetString(rs, "pago_forma_pago"));
+
             a.setDocumento_id(rs.getInt("documento_id"));
+
+            // NUEVO: Información del documento
+            a.setDocumento_numero(safeGetString(rs, "documento_numero"));
+            a.setDocumento_fecha_emision(safeGetDate(rs, "documento_fecha_emision"));
+            a.setDocumento_monto_total(safeGetBigDecimal(rs, "documento_monto_total"));
+            a.setDocumento_saldo_pendiente(safeGetBigDecimal(rs, "documento_saldo_pendiente"));
+
             a.setMonto_aplicado(rs.getBigDecimal("monto_aplicado"));
+
             java.sql.Date f = rs.getDate("fecha_aplicacion");
             if (f != null) a.setFecha_aplicacion(f.toLocalDate());
+
             return a;
         }
     };
+
+    // Métodos helper para leer columnas opcionales
+    private static String safeGetString(ResultSet rs, String columnName) {
+        try {
+            return rs.getString(columnName);
+        } catch (SQLException e) {
+            return null;
+        }
+    }
+
+    private static java.time.LocalDate safeGetDate(ResultSet rs, String columnName) {
+        try {
+            java.sql.Date date = rs.getDate(columnName);
+            return date != null ? date.toLocalDate() : null;
+        } catch (SQLException e) {
+            return null;
+        }
+    }
+
+    private static java.math.BigDecimal safeGetBigDecimal(ResultSet rs, String columnName) {
+        try {
+            return rs.getBigDecimal(columnName);
+        } catch (SQLException e) {
+            return null;
+        }
+    }
 
     /** Listar aplicaciones por pago. */
     public List<CxpAplicacion> listar(Integer pagoId) {

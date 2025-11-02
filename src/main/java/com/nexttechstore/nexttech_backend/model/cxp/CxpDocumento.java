@@ -9,7 +9,7 @@ import java.time.LocalDate;
 
 /**
  * Entidad para dbo.cxp_documentos (snake_case).
- * Campos exactos del DDL y SPs.
+ * Campos exactos del DDL y SPs + campos adicionales para nombres.
  */
 @Data
 public class CxpDocumento {
@@ -18,11 +18,18 @@ public class CxpDocumento {
     @NotNull(message = "proveedor_id es obligatorio.")
     private Integer proveedor_id;
 
+    // NUEVO: Nombre del proveedor (viene del SP con JOIN)
+    private String proveedor_nombre;
+
     @NotBlank(message = "origen_tipo es obligatorio (C/F).")
     private String origen_tipo; // CHAR(1)
 
     @NotNull(message = "origen_id es obligatorio.")
     private Integer origen_id;
+
+    // NUEVO: Nombre/número del origen (viene del SP con JOIN)
+    // Para origen_tipo='C' será el numero_compra, para 'F' será numero_factura
+    private String origen_nombre;
 
     @NotBlank(message = "numero_documento es obligatorio.")
     private String numero_documento;
@@ -46,5 +53,5 @@ public class CxpDocumento {
     private String estado; // 'P','C','A'
 
     // audit
-    private java.time.OffsetDateTime fecha_creacion; // si mapeas DATETIME a OffsetDateTime, opcional
+    private java.time.OffsetDateTime fecha_creacion;
 }

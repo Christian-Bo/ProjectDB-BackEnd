@@ -17,6 +17,9 @@ public class CxpPago {
     @NotNull(message = "proveedor_id es obligatorio.")
     private Integer proveedor_id;
 
+    // NUEVO: Nombre del proveedor (viene del SP con JOIN)
+    private String proveedor_nombre;
+
     @NotNull(message = "fecha_pago es obligatoria.")
     private LocalDate fecha_pago;
 
