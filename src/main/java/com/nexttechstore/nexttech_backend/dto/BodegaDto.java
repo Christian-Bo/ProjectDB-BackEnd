@@ -12,9 +12,10 @@ public class BodegaDto {
     private Integer id;
     private String codigo;
     private String nombre;
-    private String ubicacion;
+    private String direccion;
     private Integer capacidadMaxima;
     private Integer responsableId;
+    private String responsableNombre;
     private String telefono;
     private String email;
     private Boolean activo;

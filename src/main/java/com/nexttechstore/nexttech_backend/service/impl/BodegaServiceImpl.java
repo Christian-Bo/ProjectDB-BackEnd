@@ -39,13 +39,11 @@ public class BodegaServiceImpl implements BodegaService {
     @Override
     public BodegaDto crearBodega(BodegaDto bodegaDto) {
         Map<String, Object> result = bodegaSpRepository.crearBodega(
-                bodegaDto.getCodigo(),
                 bodegaDto.getNombre(),
-                bodegaDto.getUbicacion(),
-                bodegaDto.getCapacidadMaxima(),
-                bodegaDto.getResponsableId(),
+                bodegaDto.getDireccion(),
                 bodegaDto.getTelefono(),
-                bodegaDto.getEmail()
+                bodegaDto.getEmail(),
+                bodegaDto.getResponsableId()
         );
 
         if (result != null && result.containsKey("id")) {
@@ -60,13 +58,11 @@ public class BodegaServiceImpl implements BodegaService {
     public BodegaDto actualizarBodega(Integer id, BodegaDto bodegaDto) {
         bodegaSpRepository.actualizarBodega(
                 id,
-                bodegaDto.getCodigo(),
                 bodegaDto.getNombre(),
-                bodegaDto.getUbicacion(),
-                bodegaDto.getCapacidadMaxima(),
-                bodegaDto.getResponsableId(),
+                bodegaDto.getDireccion(),
                 bodegaDto.getTelefono(),
-                bodegaDto.getEmail()
+                bodegaDto.getEmail(),
+                bodegaDto.getResponsableId()
         );
 
         return obtenerBodegaPorId(id);
@@ -80,11 +76,12 @@ public class BodegaServiceImpl implements BodegaService {
     private BodegaDto mapearBodega(Map<String, Object> row) {
         BodegaDto dto = new BodegaDto();
         dto.setId((Integer) row.get("id"));
-        dto.setCodigo((String) row.get("codigo"));
+        dto.setCodigo(null); // No viene del SP
         dto.setNombre((String) row.get("nombre"));
-        dto.setUbicacion((String) row.get("ubicacion"));
-        dto.setCapacidadMaxima((Integer) row.get("capacidad_maxima"));
+        dto.setDireccion((String) row.get("direccion"));
+        dto.setCapacidadMaxima(null); // No viene del SP
         dto.setResponsableId((Integer) row.get("responsable_id"));
+        dto.setResponsableNombre((String) row.get("responsable_nombre"));
         dto.setTelefono((String) row.get("telefono"));
         dto.setEmail((String) row.get("email"));
         dto.setActivo((Boolean) row.get("activo"));

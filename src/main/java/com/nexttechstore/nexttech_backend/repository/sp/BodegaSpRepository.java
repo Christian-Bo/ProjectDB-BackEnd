@@ -39,29 +39,26 @@ public class BodegaSpRepository {
         return lista.isEmpty() ? null : lista.get(0);
     }
 
-    public Map<String, Object> crearBodega(String codigo, String nombre, String ubicacion,
-                                           Integer capacidadMaxima, Integer responsableId,
-                                           String telefono, String email) {
+    // CORREGIDO: Solo los parámetros que el SP espera
+    public Map<String, Object> crearBodega(String nombre, String direccion,
+                                           String telefono, String email,
+                                           Integer responsableId) {
         SimpleJdbcCall jdbcCall = new SimpleJdbcCall(jdbcTemplate)
                 .withProcedureName("sp_bodega_crear")
                 .declareParameters(
-                        new SqlParameter("codigo", Types.NVARCHAR),
                         new SqlParameter("nombre", Types.NVARCHAR),
-                        new SqlParameter("ubicacion", Types.NVARCHAR),
-                        new SqlParameter("capacidad_maxima", Types.INTEGER),
-                        new SqlParameter("responsable_id", Types.INTEGER),
+                        new SqlParameter("direccion", Types.NVARCHAR),
                         new SqlParameter("telefono", Types.NVARCHAR),
-                        new SqlParameter("email", Types.NVARCHAR)
+                        new SqlParameter("email", Types.NVARCHAR),
+                        new SqlParameter("responsable_id", Types.INTEGER)
                 );
 
         Map<String, Object> params = new HashMap<>();
-        params.put("codigo", codigo);
         params.put("nombre", nombre);
-        params.put("ubicacion", ubicacion);
-        params.put("capacidad_maxima", capacidadMaxima);
-        params.put("responsable_id", responsableId);
+        params.put("direccion", direccion);
         params.put("telefono", telefono);
         params.put("email", email);
+        params.put("responsable_id", responsableId);
 
         Map<String, Object> result = jdbcCall.execute(params);
         List<Map<String, Object>> lista = (List<Map<String, Object>>) result.get("#result-set-1");
@@ -69,31 +66,28 @@ public class BodegaSpRepository {
         return lista.isEmpty() ? null : lista.get(0);
     }
 
-    public void actualizarBodega(Integer id, String codigo, String nombre, String ubicacion,
-                                 Integer capacidadMaxima, Integer responsableId,
-                                 String telefono, String email) {
+    // CORREGIDO: Solo los parámetros que el SP espera
+    public void actualizarBodega(Integer id, String nombre, String direccion,
+                                 String telefono, String email,
+                                 Integer responsableId) {
         SimpleJdbcCall jdbcCall = new SimpleJdbcCall(jdbcTemplate)
                 .withProcedureName("sp_bodega_actualizar")
                 .declareParameters(
                         new SqlParameter("id", Types.INTEGER),
-                        new SqlParameter("codigo", Types.NVARCHAR),
                         new SqlParameter("nombre", Types.NVARCHAR),
-                        new SqlParameter("ubicacion", Types.NVARCHAR),
-                        new SqlParameter("capacidad_maxima", Types.INTEGER),
-                        new SqlParameter("responsable_id", Types.INTEGER),
+                        new SqlParameter("direccion", Types.NVARCHAR),
                         new SqlParameter("telefono", Types.NVARCHAR),
-                        new SqlParameter("email", Types.NVARCHAR)
+                        new SqlParameter("email", Types.NVARCHAR),
+                        new SqlParameter("responsable_id", Types.INTEGER)
                 );
 
         Map<String, Object> params = new HashMap<>();
         params.put("id", id);
-        params.put("codigo", codigo);
         params.put("nombre", nombre);
-        params.put("ubicacion", ubicacion);
-        params.put("capacidad_maxima", capacidadMaxima);
-        params.put("responsable_id", responsableId);
+        params.put("direccion", direccion);
         params.put("telefono", telefono);
         params.put("email", email);
+        params.put("responsable_id", responsableId);
 
         jdbcCall.execute(params);
     }
