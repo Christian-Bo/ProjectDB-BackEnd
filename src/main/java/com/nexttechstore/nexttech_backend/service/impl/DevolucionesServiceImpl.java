@@ -1,64 +1,59 @@
+// src/main/java/com/nexttechstore/nexttech_backend/service/impl/DevolucionesServiceImpl.java
 package com.nexttechstore.nexttech_backend.service.impl;
 
-import com.nexttechstore.nexttech_backend.dto.DevolucionCreateRequest;
-import com.nexttechstore.nexttech_backend.repository.sp.DevolucionesSpRepository;
+import com.nexttechstore.nexttech_backend.dto.devoluciones.DevolucionCreateRequestDto;
+import com.nexttechstore.nexttech_backend.repository.orm.DevolucionesCommandRepository;
+import com.nexttechstore.nexttech_backend.repository.orm.DevolucionesQueryRepository;
 import com.nexttechstore.nexttech_backend.service.api.DevolucionesService;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Service
 public class DevolucionesServiceImpl implements DevolucionesService {
 
-    private final DevolucionesSpRepository repo;
+    private final DevolucionesQueryRepository query;
+    private final DevolucionesCommandRepository command;
 
-    public DevolucionesServiceImpl(DevolucionesSpRepository repo) {
-        this.repo = repo;
+    public DevolucionesServiceImpl(DevolucionesQueryRepository query,
+                                   DevolucionesCommandRepository command) {
+        this.query = query;
+        this.command = command;
     }
 
     @Override
-    @Transactional
-    public int crear(DevolucionCreateRequest req) {
-        try {
-            return repo.crearDevolucion(req);
-        } catch (Exception ex) {
-            throw new RuntimeException(ex.getMessage(), ex);
-        }
+    public List<Map<String, Object>> listar(LocalDate desde, LocalDate hasta, Integer clienteId, String numero, int page, int size) {
+        return query.listar(desde, hasta, clienteId, numero, page, size);
     }
 
     @Override
-    @Transactional
-    public void anular(int devolucionId, int usuarioId) {
-        try {
-            repo.anularDevolucion(devolucionId, usuarioId);
-        } catch (Exception ex) {
-            throw new RuntimeException(ex.getMessage(), ex);
-        }
+    public Map<String, Object> crear(DevolucionCreateRequestDto req) throws Exception {
+        var r = command.crear(req);
+        Map<String, Object> out = new HashMap<>();
+        out.put("status", r.code());
+        out.put("message", r.message());
+        out.put("id", r.devolucionId());
+        return out;
     }
 
     @Override
-    public Map<String, Object> obtenerPorId(int devolucionId) {
-        try {
-            return repo.getDevolucionById(devolucionId);
-        } catch (Exception ex) {
-            throw new RuntimeException(ex.getMessage(), ex);
-        }
+    public List<Map<String, Object>> saldosPorVenta(int ventaId) {
+        return query.saldosPorVenta(ventaId);
     }
 
+    // NUEVO
     @Override
-    public List<Map<String, Object>> listar(LocalDate desde,
-                                            LocalDate hasta,
-                                            Integer ventaId,
-                                            Integer clienteId,
-                                            Integer page,
-                                            Integer size) {
-        try {
-            return repo.listarDevoluciones(desde, hasta, ventaId, clienteId, page, size);
-        } catch (Exception ex) {
-            throw new RuntimeException(ex.getMessage(), ex);
+    public Map<String, Object> obtener(int devolucionId) {
+        Map<String, Object> header = query.obtenerHeader(devolucionId);
+        if (header == null || header.isEmpty()) {
+            throw new RuntimeException("Devolución no encontrada: id=" + devolucionId);
         }
+        List<Map<String, Object>> items = query.obtenerItems(devolucionId);
+        Map<String, Object> result = new HashMap<>(header);
+        result.put("items", items);
+        return result;
     }
 }

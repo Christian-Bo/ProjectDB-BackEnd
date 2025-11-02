@@ -1,9 +1,6 @@
 package com.nexttechstore.nexttech_backend.repository.orm;
 
-import com.nexttechstore.nexttech_backend.dto.catalogos.BodegaDto;
-import com.nexttechstore.nexttech_backend.dto.catalogos.ClienteDto;
-import com.nexttechstore.nexttech_backend.dto.catalogos.EmpleadoDto;
-import com.nexttechstore.nexttech_backend.dto.catalogos.ProductoStockDto;
+import com.nexttechstore.nexttech_backend.dto.catalogos.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -66,7 +63,6 @@ public class CatalogosQueryRepository {
     // ---- PRODUCTOS CON STOCK (opcional por bodega) ----
     public List<ProductoStockDto> productosConStock(Integer bodegaId) {
 
-        // Caso A: SIN bodega -> stock total (SUM) por producto
         if (bodegaId == null) {
             String sql = """
                 SELECT TOP 500
@@ -90,7 +86,6 @@ public class CatalogosQueryRepository {
             ));
         }
 
-        // Caso B: CON bodega -> stock específico de esa bodega
         String sql = """
             SELECT TOP 500
                    p.id,
@@ -114,6 +109,28 @@ public class CatalogosQueryRepository {
         ));
     }
 
+    // ---- PRODUCTOS LITE (para el modal de Precios Especiales) ----
+    public List<ProductoLiteDto> productosLite(String texto, int max) {
+        String q = "%" + (texto == null ? "" : texto.trim()) + "%";
+        int limit = Math.max(1, Math.min(200, max));
+        String sql = """
+            SELECT TOP (?) id, codigo, nombre
+            FROM dbo.productos
+            WHERE estado = 'A'
+              AND (codigo LIKE ? OR nombre LIKE ?)
+            ORDER BY nombre
+        """;
+        return jdbc.query(sql, ps -> {
+            ps.setInt(1, limit);
+            ps.setString(2, q);
+            ps.setString(3, q);
+        }, (rs, i) -> new ProductoLiteDto(
+                rs.getInt("id"),
+                rs.getString("codigo"),
+                rs.getString("nombre")
+        ));
+    }
+
     // ---- SERIES FACTURA ----
     public List<SerieItem> seriesFactura() {
         String sql = """
@@ -130,4 +147,46 @@ public class CatalogosQueryRepository {
     }
 
     public record SerieItem(int id, String serie, int correlativo) {}
+
+    // ================== NUEVO: VENTAS LITE ==================
+    public List<VentaLiteDto> ventasLite(int max) {
+        String sql = """
+            SELECT TOP (?) v.id,
+                           v.numero_venta,
+                           COALESCE(c.nombre, CONCAT('ID ', v.cliente_id)) AS cliente_nombre
+            FROM dbo.ventas v
+            LEFT JOIN dbo.clientes c ON c.id = v.cliente_id
+            WHERE v.estado <> 'A'
+            ORDER BY v.id DESC
+        """;
+        return jdbc.query(sql, ps -> ps.setInt(1, max), (rs, i) ->
+                new VentaLiteDto(
+                        rs.getInt("id"),
+                        rs.getString("numero_venta"),
+                        rs.getString("cliente_nombre")
+                )
+        );
+    }
+
+    // ================== NUEVO: DETALLE LITE POR VENTA ==================
+    public List<DetalleVentaLiteDto> detalleVentaLite(int ventaId) {
+        String sql = """
+            SELECT dv.id,
+                   dv.producto_id,
+                   COALESCE(p.nombre, CONCAT('ID ', dv.producto_id)) AS producto_nombre,
+                   dv.cantidad
+            FROM dbo.detalle_ventas dv
+            LEFT JOIN dbo.productos p ON p.id = dv.producto_id
+            WHERE dv.venta_id = ?
+            ORDER BY dv.id
+        """;
+        return jdbc.query(sql, ps -> ps.setInt(1, ventaId), (rs, i) ->
+                new DetalleVentaLiteDto(
+                        rs.getInt("id"),
+                        rs.getInt("producto_id"),
+                        rs.getString("producto_nombre"),
+                        rs.getInt("cantidad")
+                )
+        );
+    }
 }

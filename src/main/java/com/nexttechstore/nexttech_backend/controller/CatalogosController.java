@@ -1,14 +1,12 @@
 package com.nexttechstore.nexttech_backend.controller;
 
-import com.nexttechstore.nexttech_backend.dto.catalogos.BodegaDto;
-import com.nexttechstore.nexttech_backend.dto.catalogos.ClienteDto;
-import com.nexttechstore.nexttech_backend.dto.catalogos.ProductoStockDto;
-import com.nexttechstore.nexttech_backend.dto.catalogos.EmpleadoDto;
+import com.nexttechstore.nexttech_backend.dto.catalogos.*;
 import com.nexttechstore.nexttech_backend.repository.orm.CatalogosQueryRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/catalogos")
@@ -56,4 +54,29 @@ public class CatalogosController {
         ORDER BY serie
     """);
     }
+
+    // ================== NUEVOS ENDPOINTS PARA DEVOLUCIONES ==================
+
+    /** Llenar el <select> de ventas por número (máximo 1..200). */
+    @GetMapping("/ventas-lite")
+    public List<VentaLiteDto> ventasLite(@RequestParam(defaultValue = "50") int max) {
+        int safeMax = Math.max(1, Math.min(200, max));
+        return repo.ventasLite(safeMax);
+    }
+
+    /** Traer líneas de una venta para pre-cargar el maestro/detalle del modal. */
+    @GetMapping("/venta/{ventaId}/detalle-lite")
+    public List<DetalleVentaLiteDto> detalleVentaLite(@PathVariable int ventaId) {
+        return repo.detalleVentaLite(ventaId);
+    }
+
+    // ======= NUEVO: productos-lite para tu modal =======
+    @GetMapping("/productos-lite")
+    public List<ProductoLiteDto> productosLite(
+            @RequestParam(defaultValue = "") String texto,
+            @RequestParam(defaultValue = "50") int max
+    ){
+        return repo.productosLite(texto, max);
+    }
+
 }
