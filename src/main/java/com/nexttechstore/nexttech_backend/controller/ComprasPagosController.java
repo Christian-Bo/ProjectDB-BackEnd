@@ -23,6 +23,12 @@ public class ComprasPagosController {
         this.service = service;
     }
 
+    /**
+     * Listado "tipo select": permite armar combos o grids sin pedir ID.
+     * Filtros opcionales:
+     *  - compraId: lista solo de esa compra
+     *  - texto: busca en forma_pago y referencia (LIKE)
+     */
     @GetMapping
     public List<CompraPago> listar(@RequestParam(required = false) Integer compraId,
                                    @RequestParam(required = false) String texto) {

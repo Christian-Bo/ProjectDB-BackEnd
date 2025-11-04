@@ -277,7 +277,7 @@ public class ComprasSpRepository {
     }
 
     // ========= EDITAR CABECERA =========
-    // Importante: como el SP devuelve un SELECT, usamos CallableStatement#execute() y no update().
+// Importante: como el SP devuelve un SELECT, usamos CallableStatement#execute() y no update().
     public int editarCabecera(CompraEditarCabeceraRequest req) {
         return jdbc.execute((Connection con) -> {
             try (CallableStatement cs = con.prepareCall("{call dbo.sp_COMPRAS_EditarCabecera(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}")) {
@@ -289,17 +289,36 @@ public class ComprasSpRepository {
                 cs.setInt(6, req.getEmpleadoCompradorId());
                 if (req.getEmpleadoAutorizaId() != null) cs.setInt(7, req.getEmpleadoAutorizaId()); else cs.setNull(7, Types.INTEGER);
                 cs.setInt(8, req.getBodegaDestinoId());
-                if (req.getDescuentoGeneral() != null) cs.setBigDecimal(9, BigDecimal.valueOf(req.getDescuentoGeneral())); else cs.setNull(9, Types.DECIMAL);
-                if (req.getObservaciones() != null && !req.getObservaciones().isBlank()) cs.setString(10, req.getObservaciones()); else cs.setNull(10, Types.NVARCHAR);
+
+                // Enviamos BigDecimal con escala fija (2) para alinearlo con DECIMAL(18,2) y el CHECK de SQL.
+                if (req.getDescuentoGeneral() != null) {
+                    cs.setBigDecimal(9, req.getDescuentoGeneral().setScale(2, java.math.RoundingMode.HALF_UP));
+                } else {
+                    cs.setNull(9, Types.DECIMAL);
+                }
+
+                if (req.getObservaciones() != null && !req.getObservaciones().isBlank()) {
+                    cs.setString(10, req.getObservaciones());
+                } else {
+                    cs.setNull(10, Types.NVARCHAR);
+                }
 
                 cs.execute(); // consume RS (no necesitamos mapear aquí)
-                // Retornamos 1 para “ok” (podrías contar updates si quieres ser más estricto)
+                // Retornamos 1 para “ok”
                 return 1;
             } catch (SQLException ex) {
-                throw new BadRequestException("Error al editar cabecera: " + ex.getMessage());
+                String msg = ex.getMessage();
+                // Mensaje claro si truena el CHECK de totales
+                if (msg != null && msg.contains("CK_compras_totales")) {
+                    throw new BadRequestException(
+                            "No se pudo guardar: los totales quedarían inválidos (revise que el descuento no exceda el subtotal y que el total no sea negativo)."
+                    );
+                }
+                throw new BadRequestException("Error al editar cabecera: " + msg);
             }
         });
     }
+
 
     // ========= AGREGAR DETALLE (1..n) =========
     // El SP devuelve las líneas insertadas con nombres → las consumimos y devolvemos el conteo insertado.
