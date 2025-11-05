@@ -148,17 +148,63 @@ public class VentasPagosSpRepository {
     public void eliminarPago(int pagoId) throws SQLException {
         final String sql =
                 "DECLARE @code INT, @msg NVARCHAR(200); " +
-                        "EXEC dbo.sp_ventas_pagos_delete @p_pago_id=?, @out_status_code=@code OUTPUT, @out_message=@msg OUTPUT; " +
+                        "EXEC dbo.sp_ventas_pagos_anular @p_pago_id=?, @out_status_code=@code OUTPUT, @out_message=@msg OUTPUT; " +
                         "SELECT @code AS code, @msg AS msg;";
-
         try (Connection c = dataSource.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, pagoId);
             try (ResultSet rs = ps.executeQuery()){
-                if (!rs.next()) throw new SQLException("sp_ventas_pagos_delete sin resultado");
+                if (!rs.next()) throw new SQLException("sp_ventas_pagos_anular sin resultado");
                 int code = rs.getInt("code");
                 String msg = rs.getString("msg");
-                if (code != 0) throw new SQLException("sp_ventas_pagos_delete ("+code+"): "+msg);
+                if (code != 0) throw new SQLException("sp_ventas_pagos_anular ("+code+"): "+msg);
+            }
+        }
+    }
+
+    public Map<String,Object> obtenerPago(int pagoId) throws SQLException {
+        final String sql = "EXEC dbo.sp_ventas_pagos_get @p_pago_id=?";
+        try (Connection c = dataSource.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, pagoId);
+            try (ResultSet rs = ps.executeQuery()){
+                if (!rs.next()) throw new SQLException("Pago no encontrado");
+                Map<String,Object> m = new HashMap<>();
+                m.put("pagoId",        readIntAny(rs,"pago_id","id"));
+                m.put("ventaId",       readIntAny(rs,"venta_id","id_venta"));
+                m.put("numeroVenta",   readStrAny(rs,"numero_venta"));
+                m.put("fechaVenta",    readSqlDateAny(rs,"fecha_venta"));
+                m.put("clienteId",     readIntAny(rs,"cliente_id"));
+                m.put("clienteCodigo", readStrAny(rs,"cliente_codigo"));
+                m.put("clienteNombre", readStrAny(rs,"cliente_nombre"));
+                m.put("formaPago",     readStrAny(rs,"forma_pago","forma"));
+                try { m.put("monto", rs.getBigDecimal("monto")); } catch(SQLException ignore){ m.put("monto", null); }
+                m.put("referencia",    readStrAny(rs,"referencia","obs"));
+                return m;
+            }
+        }
+    }
+
+    public void actualizarPago(int pagoId, String formaPago, java.math.BigDecimal monto, String referencia) throws SQLException {
+        final String sql =
+                "DECLARE @code INT, @msg NVARCHAR(200); " +
+                        "EXEC dbo.sp_ventas_pagos_update @p_pago_id=?, @p_forma_pago=?, @p_monto=?, @p_referencia=?, " +
+                        "  @out_status_code=@code OUTPUT, @out_message=@msg OUTPUT; " +
+                        "SELECT @code AS code, @msg AS msg;";
+        try (Connection c = dataSource.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            ps.setInt(1, pagoId);
+            if (formaPago==null || formaPago.isBlank()) ps.setNull(2, Types.NVARCHAR); else ps.setString(2, formaPago);
+            if (monto==null) throw new SQLException("monto requerido");
+            ps.setBigDecimal(3, monto);
+            if (referencia==null) ps.setNull(4, Types.NVARCHAR); else ps.setString(4, referencia);
+
+            try (ResultSet rs = ps.executeQuery()){
+                if (!rs.next()) throw new SQLException("sp_ventas_pagos_update sin resultado");
+                int code = rs.getInt("code");
+                String msg = rs.getString("msg");
+                if (code != 0) throw new SQLException("sp_ventas_pagos_update ("+code+"): "+msg);
             }
         }
     }

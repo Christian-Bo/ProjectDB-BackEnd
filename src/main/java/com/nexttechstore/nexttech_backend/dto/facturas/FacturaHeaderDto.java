@@ -6,8 +6,8 @@ public record FacturaHeaderDto(
         Integer id,
         Integer serieId,
         String serie,
-        String correlativo,          // <-- AHORA String
-        String numero,               // si 'numero' puede ser varchar en tu BD, déjalo String
+        String correlativo,
+        String numero,
         String fechaEmision,
         boolean activa,
         Integer ventaId,
@@ -17,5 +17,8 @@ public record FacturaHeaderDto(
         BigDecimal total,
         String cliente,
         String nit,
-        String tipoPago
+        String tipoPago,
+        // NUEVOS
+        BigDecimal descuentoLineas,
+        BigDecimal descuentoTotal
 ) {}

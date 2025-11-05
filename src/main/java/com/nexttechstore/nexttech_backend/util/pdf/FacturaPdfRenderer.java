@@ -39,6 +39,22 @@ public class FacturaPdfRenderer {
         final String docFull = esc(h.serie()) + "-" + esc(h.correlativo());
         final String condicion = "C".equalsIgnoreCase(nz(h.tipoPago())) ? "Contado" : "Crédito";
 
+        /* ===== Cálculo consistente: Subtotal BRUTO y Descuento Total ===== */
+        BigDecimal bruto = BigDecimal.ZERO;      // suma (cantidad * precio) sin descuentos
+        BigDecimal descLineas = BigDecimal.ZERO; // suma de descuentos por línea
+        for (FacturaDetalleDto it : d) {
+            BigDecimal qty = nn(it.cantidad());
+            BigDecimal prc = nn(it.precioUnitario());
+            BigDecimal dl  = nn(it.descuentoLinea());
+            bruto = bruto.add(qty.multiply(prc));
+            descLineas = descLineas.add(dl);
+        }
+        BigDecimal descGral  = nn(h.descuentoGeneral());
+        BigDecimal descTotal = descLineas.add(descGral);
+        BigDecimal iva       = nn(h.iva());
+        BigDecimal totalCalc = bruto.subtract(descTotal).add(iva);
+        /* ================================================================ */
+
         StringBuilder rows = new StringBuilder();
         for (FacturaDetalleDto it : d) {
             rows.append("<tr>")
@@ -57,22 +73,15 @@ public class FacturaPdfRenderer {
   <meta charset="utf-8"/>
   <title>Factura %s</title>
   <style>
-    /* Paleta fija y propiedades compatibles con OpenHTMLToPDF */
-    /* brand #1e78ff, brand-ink #0b3b8c, ink #0f172a, muted #64748b,
-       line #e5e7eb, paper #ffffff, accent #f8fafc, card-bg #eef2ff,
-       card-bd #c7d2fe, thead #e9eef8, row-alt #fbfdff */
-
     @page {
       size: A4;
       margin: 12mm;
-      /* Pie por página con numeración */
       @bottom-right {
         content: "Página " counter(page) " de " counter(pages);
         font-size: 10px;
         color: #64748b;
       }
     }
-
     html, body { height: 100%%; }
     body {
       margin: 0;
@@ -80,17 +89,14 @@ public class FacturaPdfRenderer {
       color: #0f172a;
       font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Helvetica, Arial;
     }
-
     .wrap { min-height: 100%%; padding: 10px 0; }
     .invoice {
       width: 100%%; max-width: 700px; margin: 0 auto;
       background: #ffffff;
       border: 1px solid #e5e7eb;
-      border-radius: 5px;  /* según tu preferencia */
+      border-radius: 5px;
       overflow: hidden;
     }
-
-    /* Header */
     .header {
       padding: 14px 18px;
       border-bottom: 1px solid #e5e7eb;
@@ -112,56 +118,31 @@ public class FacturaPdfRenderer {
     }
     .meta { text-align: right; font-size: 11px; color: #64748b; }
     .meta strong { color: #111827; }
-    .chip {
-      margin-top: 6px; display: inline-block; padding: 6px 12px;
-      border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; font-size: 11px;
-    }
-
-    /* Cards */
     .cards { padding: 12px 18px 0; }
     .cards table { width: 100%%; border-collapse: separate; border-spacing: 14px; }
-    .card {
-      background: #eef2ff; border: 1px solid #c7d2fe;
-      border-radius: 10px; padding: 12px;
-      page-break-inside: avoid;
-    }
-    .card h3 {
-      margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: #334155;
-    }
+    .card { background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 10px; padding: 12px; page-break-inside: avoid; }
+    .card h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: #334155; }
     .kv { width: 100%%; border-collapse: collapse; }
     .kv td { padding: 4px 5px; font-size: 12px; vertical-align: top; }
     .kv .lbl { width: 95px; color: #64748b; }
-
-    /* Tabla (multi-página) */
     .table-wrap { padding: 10px 18px 12px; }
     table.items { width: 100%%; border-collapse: separate; border-spacing: 0; }
-
-    thead { display: table-header-group; }  /* Repite encabezado en cada página */
-    tfoot { display: table-footer-group; }  /* Si quisieras pie por tabla */
-
+    thead { display: table-header-group; }
     table.items thead th {
       background: #e9eef8; color: #334155; font-weight: 700; text-transform: uppercase;
       letter-spacing: .3px; font-size: 11px; padding: 8px 10px;
       border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb;
     }
-    table.items thead th:first-child { border-left: 1px solid #e5e7eb; border-top-left-radius: 8px; }
-    table.items thead th:last-child  { border-right: 1px solid #e5e7eb; border-top-right-radius: 8px; }
-
     table.items tbody td {
       padding: 9px 10px; font-size: 12px;
       border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; border-bottom: 1px dashed #e5e7eb;
     }
     table.items tbody tr:nth-child(even) { background: #fbfdff; }
-
-    table.items tr { page-break-inside: avoid; }  /* No partir filas */
-
     .num { text-align: right; }
     .pill {
       background: #ffffff; border: 1px solid #e5e7eb;
       padding: 3px 6px; border-radius: 6px; display: inline-block; min-width: 62px; text-align: right;
     }
-
-    /* Totales + notas (no cortar) */
     .totals { padding: 2px 18px 16px; }
     .layout { width: 100%%; border-collapse: separate; border-spacing: 14px; }
     .notes {
@@ -171,14 +152,12 @@ public class FacturaPdfRenderer {
     }
     .sum {
       border: 1px solid #c7d2fe; border-radius: 12px; background: #fff;
-      page-break-inside: avoid; page-break-before: auto; /* salta entero a la siguiente si no cabe */
+      page-break-inside: avoid; page-break-before: auto;
     }
     .sum table { width: 100%%; border-collapse: collapse; font-size: 12px; }
     .sum td { padding: 9px 12px; border-bottom: 1px solid #e5e7eb; }
     .sum tr:last-child td { border-bottom: 0; }
     .grand { font-size: 16px; font-weight: 800; }
-
-    /* Footer documento principal (contenido propio de la factura) */
     .footer {
       border-top: 1px solid #e5e7eb; color: #64748b; font-size: 11px; padding: 10px 18px;
       page-break-inside: avoid;
@@ -260,7 +239,7 @@ public class FacturaPdfRenderer {
             <div class="sum">
               <table>
                 <tr><td class="label">Subtotal</td><td class="num">%s</td></tr>
-                <tr><td class="label">Desc. Gral.</td><td class="num">%s</td></tr>
+                <tr><td class="label">Desc. Total</td><td class="num">%s</td></tr>
                 <tr><td class="label">IVA</td><td class="num">%s</td></tr>
                 <tr><td class="grand">Total</td><td class="num grand">%s</td></tr>
               </table>
@@ -290,16 +269,17 @@ public class FacturaPdfRenderer {
                 esc(h.nit()),
                 condicion,
                 rows,                    // tbody
-                fmt(h.subtotal()),
-                fmt(h.descuentoGeneral()),
-                fmt(h.iva()),
-                fmt(h.total()),
+                fmt(bruto),              // Subtotal BRUTO
+                fmt(descTotal),          // Desc. Total = gral + líneas
+                fmt(iva),                // IVA del header
+                fmt(totalCalc),          // Total visible recalculado
                 docFull
         );
     }
 
     /* ==== helpers ==== */
     private static String nz(Object o) { return o == null ? "" : String.valueOf(o); }
+    private static BigDecimal nn(BigDecimal x) { return x == null ? BigDecimal.ZERO : x; }
 
     private static String esc(Object s) {
         if (s == null) return "";

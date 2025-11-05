@@ -42,19 +42,30 @@ public class FacturasQueryRepository {
 
     public FacturaHeaderDto obtenerHeader(int id) {
         return jdbc.query("""
-            SELECT f.id, f.serie_id, f.serie,
-                   CONVERT(varchar(50), f.correlativo) AS correlativo,
-                   CONVERT(varchar(50), f.numero)      AS numero,
-                   CONVERT(varchar(19), f.fecha_emision, 120) AS fechaEmision,
-                   f.activa,
-                   v.id AS ventaId, v.total, v.subtotal, v.iva, v.descuento_general,
-                   c.nombre AS cliente, c.nit, v.tipo_pago
-            FROM facturas f
-            JOIN ventas v ON v.id = f.referencia_id AND f.referencia_tipo='V'
-            JOIN clientes c ON c.id = v.cliente_id
-            WHERE f.id = ?
-        """, (rs)-> rs.next() ? mapHeader(rs) : null, id);
+        SELECT 
+            f.id, f.serie_id, f.serie,
+            CONVERT(varchar(50), f.correlativo) AS correlativo,
+            CONVERT(varchar(50), f.numero)      AS numero,
+            CONVERT(varchar(19), f.fecha_emision, 120) AS fechaEmision,
+            f.activa,
+            v.id AS ventaId, 
+            v.subtotal, v.descuento_general, v.iva, v.total,
+            /* NUEVO: descuentos de línea y total de descuento */
+            ISNULL(SUM(dv.descuento_linea),0)  AS descuentoLineas,
+            v.descuento_general + ISNULL(SUM(dv.descuento_linea),0) AS descuentoTotal,
+            c.nombre AS cliente, c.nit, v.tipo_pago
+        FROM facturas f
+        JOIN ventas v           ON v.id = f.referencia_id AND f.referencia_tipo='V'
+        JOIN clientes c         ON c.id = v.cliente_id
+        LEFT JOIN detalle_ventas dv ON dv.venta_id = v.id
+        WHERE f.id = ?
+        GROUP BY 
+            f.id, f.serie_id, f.serie, f.correlativo, f.numero, f.fecha_emision, f.activa,
+            v.id, v.subtotal, v.descuento_general, v.iva, v.total,
+            c.nombre, c.nit, v.tipo_pago
+    """, (rs)-> rs.next() ? mapHeader(rs) : null, id);
     }
+
 
     private FacturaHeaderDto mapHeader(ResultSet rs) {
         try {
@@ -73,12 +84,13 @@ public class FacturasQueryRepository {
                     rs.getBigDecimal("total"),
                     rs.getString("cliente"),
                     rs.getString("nit"),
-                    rs.getString("tipo_pago")
+                    rs.getString("tipo_pago"),
+                    rs.getBigDecimal("descuentoLineas"), // NUEVO
+                    rs.getBigDecimal("descuentoTotal")   // NUEVO
             );
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        } catch (Exception e) { throw new RuntimeException(e); }
     }
+
 
     public List<FacturaDetalleDto> obtenerDetallePorFactura(int facturaId) {
         return jdbc.query("""

@@ -34,4 +34,11 @@ public class VentasPagosServiceImpl implements VentasPagosService {
         try { repo.eliminarPago(pagoId); }
         catch (Exception e){ throw new RuntimeException(e.getMessage(), e); }
     }
+
+    @Override public Map<String, Object> obtenerPago(int pagoId) {
+        try { return repo.obtenerPago(pagoId); } catch (Exception e){ throw new RuntimeException(e.getMessage(), e); }
+    }
+    @Override public void actualizarPago(int pagoId, String formaPago, java.math.BigDecimal monto, String referencia) {
+        try { repo.actualizarPago(pagoId, formaPago, monto, referencia); } catch (Exception e){ throw new RuntimeException(e.getMessage(), e); }
+    }
 }

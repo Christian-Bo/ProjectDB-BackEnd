@@ -130,6 +130,16 @@ public class VentasController {
         }
     }
 
-
+    // NUEVO: actualizar pago
+    @PutMapping("/pagos/{pagoId}")
+    public Map<String,Object> actualizarPago(@PathVariable int pagoId,
+                                             @RequestBody Map<String,Object> body){
+        String forma = (String) body.get("formaPago");
+        java.math.BigDecimal monto = body.get("monto")==null? null :
+                new java.math.BigDecimal(String.valueOf(body.get("monto")));
+        String ref = (String) body.get("referencia");
+        ventasPagosService.actualizarPago(pagoId, forma, monto, ref);
+        return Map.of("pagoId", pagoId, "status", "OK");
+    }
 
 }
