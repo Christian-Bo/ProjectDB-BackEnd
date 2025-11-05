@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
@@ -42,8 +43,8 @@ public class CompraEditarCabeceraRequest {
     @NotNull
     private Integer bodegaDestinoId;
 
-    @DecimalMin(value = "0.0", inclusive = true)
-    private Double descuentoGeneral;
+    @DecimalMin(value = "0.00", inclusive = true)
+    private BigDecimal descuentoGeneral;
 
     private String observaciones;
 }
