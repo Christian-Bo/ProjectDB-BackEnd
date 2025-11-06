@@ -5,6 +5,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
@@ -12,6 +14,7 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
@@ -21,10 +24,10 @@ public class CorsConfig implements WebMvcConfigurer {
     @Value("${app.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*}")
     private String[] allowedOrigins;
 
-    @Value("${app.cors.allowed-methods:GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD}")
+    @Value("${app.cors.allowed-methods:*}")
     private String[] allowedMethods;
 
-    @Value("${app.cors.allowed-headers:Content-Type,Authorization,Accept,Origin,X-Requested-With,X-User-Id}")
+    @Value("${app.cors.allowed-headers:*}")
     private String[] allowedHeaders;
 
     @Value("${app.cors.exposed-headers:Location,Link}")
@@ -44,27 +47,41 @@ public class CorsConfig implements WebMvcConfigurer {
         log.info("Configuring CORS (WebMvc) pathPattern={} origins={}", pathPattern, String.join(",", allowedOrigins));
         registry.addMapping(pathPattern)
                 .allowedOriginPatterns(allowedOrigins)
-                .allowedMethods(allowedMethods)
-                .allowedHeaders(allowedHeaders)
+                .allowedMethods(resolveWildcard(allowedMethods))
+                .allowedHeaders(resolveWildcard(allowedHeaders))
                 .exposedHeaders(exposedHeaders)
                 .allowCredentials(allowCredentials)
                 .maxAge(maxAge);
     }
 
-    /** Filtro extra para asegurar preflights (OPTIONS) con proxies/CDNs. */
     @Bean
     public CorsFilter corsFilterBean() {
         CorsConfiguration cfg = new CorsConfiguration();
         cfg.setAllowedOriginPatterns(Arrays.asList(allowedOrigins));
-        cfg.setAllowedMethods(Arrays.asList(allowedMethods));
-        cfg.setAllowedHeaders(Arrays.asList(allowedHeaders));
+        cfg.setAllowedMethods(Arrays.asList(resolveWildcard(allowedMethods)));
+        cfg.setAllowedHeaders(Arrays.asList(resolveWildcard(allowedHeaders)));
         cfg.setExposedHeaders(Arrays.asList(exposedHeaders));
         cfg.setAllowCredentials(allowCredentials);
         cfg.setMaxAge(maxAge);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration(pathPattern, cfg);
+
         log.info("Configuring CORS (Filter) pathPattern={} origins={}", pathPattern, String.join(",", allowedOrigins));
         return new CorsFilter(source);
+    }
+
+    /** Asegura que el CorsFilter corra PRIMERO (responde preflights) */
+    @Bean
+    public FilterRegistrationBean<CorsFilter> corsFilterRegistration(CorsFilter corsFilter) {
+        FilterRegistrationBean<CorsFilter> bean = new FilterRegistrationBean<>(corsFilter);
+        bean.setOrder(Ordered.HIGHEST_PRECEDENCE);
+        return bean;
+    }
+
+    private String[] resolveWildcard(String[] arr) {
+        if (arr == null || arr.length == 0) return new String[]{"*"};
+        if (arr.length == 1 && "*".equals(arr[0])) return new String[]{"GET","POST","PUT","PATCH","DELETE","OPTIONS","HEAD"};
+        return arr;
     }
 }
