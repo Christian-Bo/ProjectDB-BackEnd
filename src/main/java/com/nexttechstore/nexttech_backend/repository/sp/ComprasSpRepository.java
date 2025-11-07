@@ -8,13 +8,12 @@ import com.nexttechstore.nexttech_backend.exception.ResourceNotFoundException;
 import com.nexttechstore.nexttech_backend.model.compras.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 
-// ====== IMPORTS JDBC EXPLÍCITOS ======
+// ====== java.sql (importes explícitos, sin Date para evitar choque) ======
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -24,19 +23,17 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
 
-// ====== FECHAS Y COLECCIONES ======
+// ====== java.util (importes explícitos, aquí sí usamos java.util.Date) ======
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;           // firma pública
-import java.util.HashMap;
+import java.util.Date;            // <- usamos este Date (java.util.Date)
 import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -44,15 +41,15 @@ import java.util.stream.Collectors;
  *
  * SPs utilizados:
  *  - dbo.sp_COMPRAS_Listar
- *  - dbo.sp_COMPRAS_ObtenerPorId           (2 RS: cabecera con nombres + detalle con nombres)
- *  - dbo.sp_COMPRAS_Crear                  (TVP dbo.tvp_DetalleCompra + OUT @CompraIdOut + RS cabecera/detalle)
- *  - dbo.sp_COMPRAS_EditarCabecera         (RS cabecera con nombres)
- *  - dbo.sp_COMPRAS_AgregarDetalle         (TVP + RS líneas insertadas con nombres)
- *  - dbo.sp_COMPRAS_EditarDetalleLinea     (RS línea actualizada con nombres)
- *  - dbo.sp_COMPRAS_QuitarDetalleLinea
- *  - dbo.sp_COMPRAS_Anular
- *  - dbo.sp_PRODUCTOS_AutoFill             (autollenado por producto + stock por bodega opcional)
- *  - dbo.sp_COMPRAS_Lookups                (3 RS: proveedores, bodegas, empleados)
+ *  - dbo.sp_COMPRAS_ObtenerPorId
+ *  - dbo.sp_COMPRAS_Crear
+ *  - dbo.sp_COMPRAS_EditarCabecera
+ *  - dbo.sp_COMPRAS_AgregarDetalle          (suma inventario por línea agregada)
+ *  - dbo.sp_COMPRAS_EditarDetalleLinea      (ajusta inventario por delta)
+ *  - dbo.sp_COMPRAS_QuitarDetalleLinea      (revierte inventario y elimina línea)
+ *  - dbo.sp_COMPRAS_Anular                  (revierte inventario de toda la compra)
+ *  - dbo.sp_PRODUCTOS_AutoFill
+ *  - dbo.sp_COMPRAS_Lookups
  */
 @Repository
 public class ComprasSpRepository {
@@ -65,7 +62,7 @@ public class ComprasSpRepository {
         this.jdbc = jdbc;
     }
 
-    // ========= Helpers de conversión seguros =========
+    // ===== Helpers de mapeo seguros =====
 
     private Integer getInt(ResultSet rs, String col) throws SQLException {
         int v = rs.getInt(col);
@@ -99,8 +96,7 @@ public class ComprasSpRepository {
         return false;
     }
 
-    // ========= LISTAR =========
-    // Ahora el SP devuelve proveedor_nombre y bodega_destino_nombre, los mapeamos directo.
+    // ===================== LISTAR =====================
     public List<CompraListItem> listar(Date fechaDel, Date fechaAl, Integer proveedorId, String estado, String texto) {
         return jdbc.query(
                 "EXEC dbo.sp_COMPRAS_Listar @FechaDel=?, @FechaAl=?, @ProveedorId=?, @Estado=?, @Texto=?",
@@ -125,20 +121,14 @@ public class ComprasSpRepository {
                     it.setProveedorId(getInt(rs, "proveedor_id"));
                     it.setBodegaDestinoId(getInt(rs, "bodega_destino_id"));
                     it.setFechaCreacion(getOffsetDateTime(rs, "fecha_creacion"));
-                    // Nuevos campos devueltos por el SP
-                    if (hasColumn(rs, "proveedor_nombre")) {
-                        it.setProveedorNombre(rs.getString("proveedor_nombre"));
-                    }
-                    if (hasColumn(rs, "bodega_destino_nombre")) {
-                        it.setBodegaDestinoNombre(rs.getString("bodega_destino_nombre"));
-                    }
+                    if (hasColumn(rs, "proveedor_nombre")) it.setProveedorNombre(rs.getString("proveedor_nombre"));
+                    if (hasColumn(rs, "bodega_destino_nombre")) it.setBodegaDestinoNombre(rs.getString("bodega_destino_nombre"));
                     return it;
                 }
         );
     }
 
-    // ========= OBTENER POR ID =========
-    // El SP ya devuelve nombres en cabecera y detalle.
+    // ===================== OBTENER POR ID =====================
     public CompraFull obtenerPorId(int compraId) {
         return jdbc.execute((Connection con) -> {
             try {
@@ -164,9 +154,7 @@ public class ComprasSpRepository {
                         rsIndex++;
                     }
 
-                    if (cabecera == null) {
-                        throw new ResourceNotFoundException("Compra no encontrada (id=" + compraId + ")");
-                    }
+                    if (cabecera == null) throw new ResourceNotFoundException("Compra no encontrada (id=" + compraId + ")");
                     return new CompraFull(cabecera, detalle);
                 }
             } catch (SQLException ex) {
@@ -193,7 +181,6 @@ public class ComprasSpRepository {
         c.setBodegaDestinoId(getInt(rs, "bodega_destino_id"));
         c.setFechaCreacion(getOffsetDateTime(rs, "fecha_creacion"));
 
-        // Nombres amigables (siempre devueltos por el SP; fallback defensivo)
         if (hasColumn(rs, "proveedor_nombre")) c.setProveedorNombre(rs.getString("proveedor_nombre"));
         if (hasColumn(rs, "empleado_comprador_nombre")) c.setEmpleadoCompradorNombre(rs.getString("empleado_comprador_nombre"));
         if (hasColumn(rs, "empleado_autoriza_nombre")) c.setEmpleadoAutorizaNombre(rs.getString("empleado_autoriza_nombre"));
@@ -220,9 +207,7 @@ public class ComprasSpRepository {
         return d;
     }
 
-    // ========= CREAR (TVP + OUT) =========
-    // Conservamos devolver el ID (compatibilidad). El SP además entrega RS con nombres (el front
-    // podría llamarlo luego con obtenerPorId si necesita la representación completa).
+    // ===================== CREAR (cabecera + TVP) =====================
     public int crear(CompraCrearRequest req) {
         return jdbc.execute((Connection con) -> {
             try {
@@ -276,8 +261,7 @@ public class ComprasSpRepository {
         });
     }
 
-    // ========= EDITAR CABECERA =========
-// Importante: como el SP devuelve un SELECT, usamos CallableStatement#execute() y no update().
+    // ===================== EDITAR CABECERA =====================
     public int editarCabecera(CompraEditarCabeceraRequest req) {
         return jdbc.execute((Connection con) -> {
             try (CallableStatement cs = con.prepareCall("{call dbo.sp_COMPRAS_EditarCabecera(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}")) {
@@ -289,14 +273,11 @@ public class ComprasSpRepository {
                 cs.setInt(6, req.getEmpleadoCompradorId());
                 if (req.getEmpleadoAutorizaId() != null) cs.setInt(7, req.getEmpleadoAutorizaId()); else cs.setNull(7, Types.INTEGER);
                 cs.setInt(8, req.getBodegaDestinoId());
-
-                // Enviamos BigDecimal con escala fija (2) para alinearlo con DECIMAL(18,2) y el CHECK de SQL.
                 if (req.getDescuentoGeneral() != null) {
                     cs.setBigDecimal(9, req.getDescuentoGeneral().setScale(2, java.math.RoundingMode.HALF_UP));
                 } else {
                     cs.setNull(9, Types.DECIMAL);
                 }
-
                 if (req.getObservaciones() != null && !req.getObservaciones().isBlank()) {
                     cs.setString(10, req.getObservaciones());
                 } else {
@@ -304,11 +285,9 @@ public class ComprasSpRepository {
                 }
 
                 cs.execute(); // consume RS (no necesitamos mapear aquí)
-                // Retornamos 1 para “ok”
                 return 1;
             } catch (SQLException ex) {
                 String msg = ex.getMessage();
-                // Mensaje claro si truena el CHECK de totales
                 if (msg != null && msg.contains("CK_compras_totales")) {
                     throw new BadRequestException(
                             "No se pudo guardar: los totales quedarían inválidos (revise que el descuento no exceda el subtotal y que el total no sea negativo)."
@@ -319,9 +298,7 @@ public class ComprasSpRepository {
         });
     }
 
-
-    // ========= AGREGAR DETALLE (1..n) =========
-    // El SP devuelve las líneas insertadas con nombres → las consumimos y devolvemos el conteo insertado.
+    // ===================== AGREGAR DETALLE (1..n) =====================
     public int agregarDetalle(int usuarioId, int compraId, List<CompraDetalleRequest> lineas) {
         return jdbc.execute((Connection con) -> {
             try {
@@ -353,11 +330,10 @@ public class ComprasSpRepository {
                     cs.setStructured(3, "dbo.tvp_DetalleCompra", tvp);
 
                     int inserted = 0;
-                    boolean hasRs = cs.execute();
+                    boolean hasRs = cs.execute(); // SP devuelve líneas insertadas (con nombres)
                     while (hasRs) {
                         try (ResultSet rs = cs.getResultSet()) {
                             if (rs != null) {
-                                // contamos filas devueltas (últimas insertadas)
                                 while (rs.next()) inserted++;
                             }
                         }
@@ -371,8 +347,7 @@ public class ComprasSpRepository {
         });
     }
 
-    // ========= EDITAR DETALLE (1 línea) =========
-    // El SP devuelve la línea resultante; la consumimos y devolvemos 1 (ok).
+    // ===================== EDITAR DETALLE (1 línea) =====================
     public int editarDetalle(CompraEditarDetalleRequest req) {
         return jdbc.execute((Connection con) -> {
             try (CallableStatement cs = con.prepareCall("{call dbo.sp_COMPRAS_EditarDetalleLinea(?, ?, ?, ?, ?, ?, ?)}")) {
@@ -384,7 +359,7 @@ public class ComprasSpRepository {
                 if (req.getLote() != null && !req.getLote().isBlank()) cs.setString(6, req.getLote()); else cs.setNull(6, Types.NVARCHAR);
                 if (req.getFechaVencimiento() != null) cs.setDate(7, java.sql.Date.valueOf(req.getFechaVencimiento())); else cs.setNull(7, Types.DATE);
 
-                cs.execute(); // consume RS
+                cs.execute(); // consume RS (línea actualizada)
                 return 1;
             } catch (SQLException ex) {
                 throw new BadRequestException("Error al editar detalle: " + ex.getMessage());
@@ -392,26 +367,19 @@ public class ComprasSpRepository {
         });
     }
 
-    // ========= QUITAR DETALLE =========
+    // ===================== QUITAR DETALLE =====================
     public int quitarDetalle(int usuarioId, int detalleId) {
         String sql = "EXEC dbo.sp_COMPRAS_QuitarDetalleLinea @UsuarioId=?, @DetalleId=?";
         return jdbc.update(sql, usuarioId, detalleId);
     }
 
-    // ========= ANULAR =========
+    // ===================== ANULAR COMPRA =====================
     public int anular(CompraAnularRequest req) {
         String sql = "EXEC dbo.sp_COMPRAS_Anular @UsuarioId=?, @CompraId=?, @Motivo=?";
         return jdbc.update(sql, req.getUsuarioId(), req.getCompraId(), req.getMotivo());
     }
 
-    // =====================================================================
-    // =====================  C A T Á L O G O S  ===========================
-    // =====================================================================
-
-    /**
-     * Ejecuta dbo.sp_COMPRAS_Lookups y devuelve SOLO el RS indicado:
-     *   rsIndex = 0 → proveedores, 1 → bodegas, 2 → empleados
-     */
+    // ===================== LOOKUPS (catálogos) =====================
     private List<Map<String,Object>> lookupsResultSet(int rsIndexWanted) {
         return jdbc.execute((Connection con) -> {
             List<Map<String,Object>> out = new ArrayList<>();
@@ -431,17 +399,14 @@ public class ComprasSpRepository {
                             while (rs.next()) {
                                 Map<String,Object> m = new LinkedHashMap<>();
                                 m.put("id", rs.getInt("id"));
-                                // El SP usa nombre/nombre_completo según RS
                                 String nombreCol = hasColumn(rs, "nombre") ? "nombre" :
                                         (hasColumn(rs, "nombre_completo") ? "nombre_completo" : "nombre");
                                 m.put("nombre", rs.getString(nombreCol));
                                 if (hasCodigo) { m.put("codigo", rs.getString("codigo")); }
-                                // Campos opcionales (si alguna vez los agregas en el SP, no rompe)
                                 if (hasColumn(rs, "nit")) m.put("nit", rs.getString("nit"));
                                 if (hasColumn(rs, "activo")) m.put("activo", rs.getObject("activo"));
                                 out.add(m);
                             }
-                            // ya cargamos el RS deseado; salimos
                             break;
                         }
                     }
@@ -455,31 +420,19 @@ public class ComprasSpRepository {
         });
     }
 
-    /** Proveedores (usa RS #0 de sp_COMPRAS_Lookups). */
     public List<Map<String,Object>> catalogoProveedores(Boolean soloActivos) {
-        // Nota: el filtro soloActivos lo maneja el SP (actualmente devuelve activos).
         List<Map<String,Object>> list = lookupsResultSet(0);
         if (soloActivos != null && !soloActivos) {
-            // Si pidieran inactivos: no soportado por SP. Devolvemos tal cual.
             log.debug("catalogoProveedores: SP devuelve activos; soloActivos={} no filtra.", soloActivos);
         }
         return list;
     }
 
-    /** Bodegas (usa RS #1 de sp_COMPRAS_Lookups). */
-    public List<Map<String,Object>> catalogoBodegas() {
-        return lookupsResultSet(1);
-    }
+    public List<Map<String,Object>> catalogoBodegas() { return lookupsResultSet(1); }
 
-    /** Empleados (usa RS #2 de sp_COMPRAS_Lookups). */
-    public List<Map<String,Object>> catalogoEmpleados() {
-        return lookupsResultSet(2);
-    }
+    public List<Map<String,Object>> catalogoEmpleados() { return lookupsResultSet(2); }
 
-    /**
-     * Catálogo de productos con búsqueda por texto (se mantiene como estaba).
-     * Suele usarse para llenar el drop list de productos previo al autofill.
-     */
+    // ===================== CAT. PRODUCTOS SIMPLE =====================
     public List<Map<String,Object>> catalogoProductos(String texto, Integer limit) {
         String base = "SELECT TOP (?) id, nombre FROM dbo.productos ";
         String where = (texto != null && !texto.isBlank()) ? "WHERE nombre LIKE ? " : "";
@@ -501,9 +454,7 @@ public class ComprasSpRepository {
         });
     }
 
-    // ========= AUTOFILL DE PRODUCTO (NUEVO) =========
-    // Llama sp_PRODUCTOS_AutoFill para que, al elegir el producto en el drop list,
-    // el front pueda autollenar unidad, precios, marca/categoría, y stock en bodega.
+    // ===================== AUTOFILL PRODUCTO =====================
     public Map<String,Object> autoFillProducto(Integer productoId, Integer bodegaId) {
         return jdbc.execute((Connection con) -> {
             try (CallableStatement cs = con.prepareCall("{call dbo.sp_PRODUCTOS_AutoFill(?, ?)}")) {
@@ -533,8 +484,7 @@ public class ComprasSpRepository {
         });
     }
 
-    // ========= (Quedan disponibles estos helpers por si otros componentes los usan) =========
-
+    // ====== util opcional ======
     private Map<Integer,String> nombreByIds(String tableFqn, String nombreCol, Collection<Integer> ids) {
         Map<Integer,String> map = new HashMap<>();
         if (ids == null || ids.isEmpty()) return map;
