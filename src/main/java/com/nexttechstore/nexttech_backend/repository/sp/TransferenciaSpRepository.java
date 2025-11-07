@@ -71,7 +71,7 @@ public class TransferenciaSpRepository {
                         new SqlParameter("fecha_transferencia", Types.DATE),
                         new SqlParameter("bodega_origen_id", Types.INTEGER),
                         new SqlParameter("bodega_destino_id", Types.INTEGER),
-                        new SqlParameter("solicitante_id", Types.INTEGER),
+                        new SqlParameter("solicitado_por", Types.INTEGER),
                         new SqlParameter("observaciones", Types.NVARCHAR),
                         new SqlParameter("detalles", Types.NVARCHAR)
                 );
@@ -81,7 +81,7 @@ public class TransferenciaSpRepository {
         params.put("fecha_transferencia", fechaTransferencia);
         params.put("bodega_origen_id", bodegaOrigenId);
         params.put("bodega_destino_id", bodegaDestinoId);
-        params.put("solicitante_id", solicitanteId);
+        params.put("solicitado_por", solicitanteId);
         params.put("observaciones", observaciones);
         params.put("detalles", detallesJson);
 

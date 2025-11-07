@@ -135,6 +135,20 @@ public class TransferenciaServiceImpl implements TransferenciaService {
 
             String detallesJsonString = mapper.writeValueAsString(detallesJson);
 
+// ========== DEBUG AGREGADO ==========
+            System.out.println("========================================");
+            System.out.println("DEBUG EN SERVICE - ANTES DE REPOSITORY:");
+            System.out.println("========================================");
+            System.out.println("numeroTransferencia: " + transferenciaDto.getNumeroTransferencia());
+            System.out.println("fechaTransferencia: " + transferenciaDto.getFechaTransferencia());
+            System.out.println("bodegaOrigenId: " + transferenciaDto.getBodegaOrigenId());
+            System.out.println("bodegaDestinoId: " + transferenciaDto.getBodegaDestinoId());
+            System.out.println("solicitanteId: " + transferenciaDto.getSolicitanteId());
+            System.out.println("observaciones: " + transferenciaDto.getObservaciones());
+            System.out.println("detallesJson: " + detallesJsonString);
+            System.out.println("========================================");
+// ========== FIN DEBUG ==========
+
             Map<String, Object> result = transferenciaSpRepository.crearTransferencia(
                     transferenciaDto.getNumeroTransferencia(),
                     (transferenciaDto.getFechaTransferencia() != null
@@ -142,7 +156,6 @@ public class TransferenciaServiceImpl implements TransferenciaService {
                             : LocalDate.now().toString()),
                     transferenciaDto.getBodegaOrigenId(),
                     transferenciaDto.getBodegaDestinoId(),
-                    // en tu DTO el campo es solicitanteId (en tu front usas "solicitadoPor": mapea en el Controller o ModelMapper)
                     transferenciaDto.getSolicitanteId(),
                     transferenciaDto.getObservaciones(),
                     detallesJsonString
@@ -155,7 +168,9 @@ public class TransferenciaServiceImpl implements TransferenciaService {
 
             return null;
         } catch (Exception e) {
-            // Loguea si quieres; devolvemos null para que Controller responda acorde
+            System.err.println("❌ ERROR EN crearTransferencia:");
+            System.err.println("Mensaje: " + e.getMessage());
+            e.printStackTrace();
             return null;
         }
     }
